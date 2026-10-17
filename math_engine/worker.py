@@ -5,25 +5,13 @@ a separate process lets the bot kill it on timeout (SymPy cannot be interrupted 
 and lets us cap its memory. Limits are applied BEFORE SymPy is imported.
 """
 import json
-import os
 import sys
 import traceback
 
 
-def _apply_limits() -> None:
-    try:
-        import resource  # POSIX only; on Windows only the wall-clock timeout applies
-    except ImportError:
-        return
-    mem_mb = int(os.environ.get("MATH_MEMORY_LIMIT_MB", "0") or 0)
-    if mem_mb > 0:
-        resource.setrlimit(resource.RLIMIT_AS, (mem_mb * 1024 * 1024,) * 2)
-    cpu = int(os.environ.get("MATH_CPU_LIMIT_SECONDS", "0") or 0)
-    if cpu > 0:
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
+from math_engine.limits import apply_limits
 
-
-_apply_limits()
+apply_limits()
 
 from dataclasses import asdict  # noqa: E402
 

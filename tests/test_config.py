@@ -14,6 +14,7 @@ def test_defaults():
     s = Settings.from_env({"DISCORD_TOKEN": "abc"})
     assert s.database_path == "data/mathbot.sqlite3"
     assert s.math_timeout_seconds == 15.0 and s.dev_guild_id is None
+    assert s.latex_max_length == 300
 
 
 def test_overrides_and_parsing():
@@ -23,7 +24,8 @@ def test_overrides_and_parsing():
 
 
 @pytest.mark.parametrize("env", [{"MATH_TIMEOUT_SECONDS": "fast"}, {"MATH_TIMEOUT_SECONDS": "0"},
-                                 {"MATH_MEMORY_LIMIT_MB": "1"}, {"DEV_GUILD_ID": "abc"}])
+                                 {"MATH_MEMORY_LIMIT_MB": "1"}, {"DEV_GUILD_ID": "abc"},
+                                 {"LATEX_MAX_LENGTH": "5"}])
 def test_invalid_numbers_are_rejected(env):
     with pytest.raises(ConfigError):
         Settings.from_env({"DISCORD_TOKEN": "abc", **env})

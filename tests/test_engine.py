@@ -1,4 +1,6 @@
 """End-to-end tests of the subprocess sandbox. Each test that spawns a worker takes about a second."""
+import sys
+
 import pytest
 
 from math_engine.engine import MathEngine
@@ -31,6 +33,7 @@ async def test_timeout_kills_the_worker():
         await MathEngine(timeout=0.05).run("simplify", expression="x + 1")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="memory cap uses POSIX resource limits")
 async def test_memory_limit_is_enforced_as_a_clean_failure():
     with pytest.raises(ComputeFailed):
         await MathEngine(memory_limit_mb=20).run("simplify", expression="x + 1")

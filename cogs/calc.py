@@ -1,6 +1,7 @@
 """Symbolic calculator slash commands (thin layer: parse arguments, call the engine, format the reply)."""
 from __future__ import annotations
 
+import io
 import logging
 from typing import Literal, Optional
 
@@ -9,17 +10,31 @@ from discord import app_commands
 from discord.ext import commands
 
 from math_engine.engine import MathEngine
-from math_engine.errors import ComputeFailed, ComputeTimeout, InputError
+from math_engine.errors import ComputeFailed, ComputeTimeout, InputError, MathError
+from rendering.renderer import LatexRenderer
 
 from .formatting import format_error, format_result
 
 log = logging.getLogger(__name__)
 COOLDOWN = dict(rate=1, per=3.0, key=lambda i: i.user.id)  # one calculation per user per 3 seconds
+RESULT_LATEX_MAX = 1500  # results can be longer than what users are allowed to type into /latex
 
 
 class Calc(commands.Cog):
-    def __init__(self, engine: MathEngine) -> None:
+    def __init__(self, engine: MathEngine, renderer: LatexRenderer | None = None) -> None:
         self.engine = engine
+        self.renderer = renderer  # None = text-only output
+
+    async def _render_image(self, result) -> discord.File | None:
+        """Typeset the result as an image. Any failure falls back to plain text; it never breaks the command."""
+        if self.renderer is None or not result.established or not result.latex:
+            return None
+        try:
+            png = await self.renderer.render(result.latex, max_length=RESULT_LATEX_MAX)
+        except MathError as exc:
+            log.warning("Could not render result as an image (%s); sending text. LaTeX: %.200r", exc, result.latex)
+            return None
+        return discord.File(io.BytesIO(png), filename="result.png", description=result.text[:1000])
 
     async def _run(self, interaction: discord.Interaction, op: str, title: str, query: str, **args) -> None:
         await interaction.response.defer(thinking=True)  # SymPy can take longer than Discord's 3-second window
@@ -32,7 +47,9 @@ class Calc(commands.Cog):
         except ComputeFailed as exc:
             await interaction.followup.send(format_error("failed", str(exc)))
         else:
-            await interaction.followup.send(format_result(title, query, result))
+            picture = await self._render_image(result)
+            kwargs = {"file": picture} if picture else {}
+            await interaction.followup.send(format_result(title, query, result, has_image=picture is not None), **kwargs)
 
     @app_commands.command(name="simplify", description="Simplify an expression, e.g. (x^2 - 1)/(x - 1)")
     @app_commands.describe(expression="Expression using + - * / ^, parentheses, and functions like sin, cos, sqrt, log")
@@ -76,4 +93,4 @@ class Calc(commands.Cog):
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Calc(bot.engine))  # type: ignore[attr-defined]
+    await bot.add_cog(Calc(bot.engine, bot.renderer))  # type: ignore[attr-defined]

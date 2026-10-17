@@ -1,6 +1,7 @@
 """Application entry point: ``python bot.py``."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 
@@ -10,9 +11,11 @@ from discord.ext import commands
 from config import ConfigError, Settings
 from database.db import Database
 from math_engine.engine import MathEngine
+from math_engine.sandbox import Sandbox
+from rendering.renderer import LatexRenderer
 
 log = logging.getLogger("mathbot")
-EXTENSIONS = ("cogs.core", "cogs.calc")
+EXTENSIONS = ("cogs.core", "cogs.calc", "cogs.latex")
 
 
 class MathBot(commands.Bot):
@@ -23,13 +26,16 @@ class MathBot(commands.Bot):
             allowed_mentions=discord.AllowedMentions.none(),  # echoed user text can never ping anyone
         )
         self.settings = settings
-        self.engine = MathEngine(
+        # One shared sandbox: calculations and rendering draw from the same pool of worker slots.
+        self.sandbox = Sandbox(
             timeout=settings.math_timeout_seconds,
             memory_limit_mb=settings.math_memory_limit_mb,
-            max_input_length=settings.math_max_input_length,
             max_concurrent=settings.math_max_concurrent,
         )
+        self.engine = MathEngine(sandbox=self.sandbox, max_input_length=settings.math_max_input_length)
+        self.renderer = LatexRenderer(self.sandbox, max_length=settings.latex_max_length)
         self.db: Database | None = None
+        self._warm_up_task: asyncio.Task | None = None
 
     async def setup_hook(self) -> None:
         self.db = await Database.open(self.settings.database_path)
@@ -43,6 +49,8 @@ class MathBot(commands.Bot):
         else:
             synced = await self.tree.sync()
             log.info("Synced %d global commands (may take a while to appear)", len(synced))
+        # Build matplotlib's font cache in the background so the first /latex isn't slow.
+        self._warm_up_task = asyncio.create_task(self.renderer.warm_up())
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (id=%s)", self.user, getattr(self.user, "id", "?"))

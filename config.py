@@ -33,6 +33,7 @@ class Settings:
     math_memory_limit_mb: int = 512
     math_max_input_length: int = 200
     math_max_concurrent: int = 2
+    latex_max_length: int = 300
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
@@ -50,4 +51,5 @@ class Settings:
             math_memory_limit_mb=_number(env, "MATH_MEMORY_LIMIT_MB", cls.math_memory_limit_mb, int, 64),
             math_max_input_length=_number(env, "MATH_MAX_INPUT_LENGTH", cls.math_max_input_length, int, 10),
             math_max_concurrent=_number(env, "MATH_MAX_CONCURRENT", cls.math_max_concurrent, int, 1),
+            latex_max_length=_number(env, "LATEX_MAX_LENGTH", cls.latex_max_length, int, 20),
         )

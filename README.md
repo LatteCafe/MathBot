@@ -2,9 +2,10 @@
 
 A modular, free-to-run Discord bot for mathematics, built with `discord.py` and SymPy.
 
-**Status: Milestone 1.** Implemented: project foundation, configuration, SQLite migrations, and the
-symbolic calculator (`/simplify`, `/diff`, `/solve`). Not yet implemented: LaTeX image rendering,
-Problem of the Day, contests, newsletter (see the roadmap below).
+**Status: Milestone 2a.** Implemented: project foundation, configuration, SQLite migrations, the symbolic
+calculator (`/simplify`, `/diff`, `/solve`), and LaTeX rendering (`/latex`, plus typeset calculator results).
+Not yet implemented: factor/expand/integrate/limit/matrix calculator operations, Problem of the Day, contests,
+newsletter (see the roadmap below).
 
 ## Commands
 
@@ -13,7 +14,11 @@ Problem of the Day, contests, newsletter (see the roadmap below).
 | `/simplify expression` | `(x^2 - 1)/(x - 1)` | |
 | `/diff expression [variable] [order]` | `x^3 * sin(x)` | order 1–5; variable optional if only one |
 | `/solve equation [variable] [domain]` | `x^2 - 4 = 0` | `real` (default) or `complex`; no `=` means "= 0" |
+| `/latex expression` | `\int_0^1 x^2\,dx` | renders LaTeX math as an image (see "LaTeX syntax" below) |
 | `/ping` | | liveness check |
+
+Calculator results are typeset as an image when possible. The plain-text result stays in the message so it can be
+copied, and if an image cannot be produced the bot sends text only; the command never fails because of rendering.
 
 **Input syntax:** `+ - * / ^`, parentheses, implicit multiplication (`2x`, `(x+1)(x-1)`), constants `pi`, `e`, `oo`,
 single-letter variables, and the functions `sin cos tan asin acos atan sinh cosh tanh exp log ln sqrt abs`.
@@ -22,8 +27,32 @@ Decimals are treated as exact fractions (`0.5` = `1/2`), so results stay exact.
 **Exact vs approximate:** exact results are always shown first; a decimal approximation is shown separately,
 and only when it adds information (e.g. for `sqrt(2)`, not for `3/4`).
 
+**Variables:** `/diff` treats variables as real numbers (so d/dx |x| is `sign(x)`). `/solve` and `/simplify`
+use SymPy's default assumptions.
+
 **Honest failures:** if SymPy cannot solve an equation in closed form, the bot says the result is
 *not established*. It never reports "no solutions" unless that was actually established.
+
+## LaTeX syntax (`/latex`)
+
+Type the math itself, without `$` signs (they are stripped if you include them). Rendering is done locally with
+matplotlib's math engine, so nothing is sent to a third-party service and no TeX installation is needed.
+
+| Supported | Examples |
+|---|---|
+| Fractions, roots, binomials | `\frac{a}{b}` `\dfrac{1}{2}` `\sqrt{x}` `\sqrt[3]{x}` `\binom{n}{k}` |
+| Integrals, sums, products | `\int_0^1 x^2\,dx` `\sum_{n=1}^{\infty} \frac{1}{n^2}` `\prod_{k=1}^n k` |
+| Limits and functions | `\lim_{x \to 0} \frac{\sin x}{x}` `\sin` `\cos` `\log` `\arctan` |
+| Greek and symbols | `\alpha` `\beta` `\Omega` `\pi` `\infty` `\partial` `\nabla` `\pm` `\leq` `\neq` `\approx` |
+| Fonts and accents | `\mathbb{R}` `\mathcal{L}` `\mathrm{d}` `\text{if }` `\hat{x}` `\vec{v}` `\overline{z}` |
+| Delimiters | `\left( ... \right)` `\left\{ ... \right\}` `\left| ... \right|` |
+| **Matrices** | `\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}`, also `bmatrix`, `vmatrix`, `matrix`; up to 10x10 |
+
+**Not supported:** other environments (`cases`, `align`, ...), nested matrices, custom macros/packages, multi-line
+equations. Matplotlib has no matrix support of its own, so matrices are laid out by this project's own code
+(`rendering/draw.py`); they can sit inside a larger expression (`A = \begin{pmatrix}...\end{pmatrix}^{-1}`)
+but not inside one another. Malformed input gets a short error message, not a stack trace. Limits: 300 characters
+(`LATEX_MAX_LENGTH`) and a maximum image size; images are drawn black on white so they read on dark and light themes.
 
 ## Quick start (local)
 
@@ -31,7 +60,7 @@ Requires Python 3.10+.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install -r requirements-dev.txt     # re-run this after pulling updates: dependencies change
 cp .env.example .env          # then set DISCORD_TOKEN (and DEV_GUILD_ID for instant command updates)
 python -m pytest              # run the tests
 python bot.py                 # start the bot
@@ -54,7 +83,8 @@ All via environment variables (or `.env`). See `.env.example`.
 | `MATH_TIMEOUT_SECONDS` | `15` | Wall-clock limit per calculation (includes SymPy start-up) |
 | `MATH_MEMORY_LIMIT_MB` | `512` | Address-space cap for the calculation process |
 | `MATH_MAX_INPUT_LENGTH` | `200` | Max characters per expression |
-| `MATH_MAX_CONCURRENT` | `2` | Calculations running at once (protects small servers) |
+| `MATH_MAX_CONCURRENT` | `2` | Worker processes (calculations and renders together) running at once |
+| `LATEX_MAX_LENGTH` | `300` | Max characters per `/latex` expression |
 
 ## How the calculator stays safe
 
@@ -67,6 +97,8 @@ User input is **never** passed to `eval()`, `exec()` or `sympify()`.
 2. Invalid input is rejected in the bot process, so it never spawns a worker.
 3. Valid input runs in a **separate worker process** (`math_engine/worker.py`) with a wall-clock timeout (the process
    is killed on expiry), a memory cap, and a CPU-time cap. The worker's environment contains no secrets.
+   LaTeX rendering uses the same sandbox (`rendering/worker.py`). matplotlib's math parser never executes user
+   input, but rendering is still isolated and size-limited.
 4. The worker converts the validated AST to SymPy objects explicitly (`math_engine/convert.py`).
 
 Known limit: the up-front power bounds are a first line of defence, not a proof that no expression can be slow.
@@ -82,7 +114,12 @@ cogs/                  Discord layer only (slash commands, message formatting)
 math_engine/           NO Discord imports
   validate.py            safety gate (stdlib only)
   convert.py, operations.py, worker.py   SymPy side, runs in the worker process
-  engine.py              async facade: pre-check, spawn worker, timeout, parse result
+  engine.py              async facade: pre-check, call the sandbox, parse result
+  sandbox.py, limits.py  run a worker process with timeout, memory cap, minimal environment (shared with rendering)
+rendering/             NO Discord imports
+  parse.py               LaTeX validation and splitting into math/matrix segments (stdlib only)
+  draw.py, worker.py     matplotlib drawing + matrix layout; runs in the worker process
+  renderer.py            async facade used by the cogs
 database/              SQLite connection + versioned migrations (database/migrations/NNN_*.sql)
 tests/                 pytest suite
 deploy/mathbot.service systemd unit
@@ -121,19 +158,24 @@ If every calculation fails with "stopped unexpectedly" on a small or ARM VM, try
 ## Tests
 
 ```bash
-python -m pytest              # whole suite (about 2 seconds)
+python -m pytest              # whole suite (about 10 seconds)
 python -m pytest -k validate  # just the input-validation tests
 ```
 
 Covered: input validation (accept/reject lists), SymPy operations, the subprocess sandbox (timeout, memory limit,
-secret-free environment), database migrations, configuration, message formatting, command registration.
-**Not covered:** behaviour against the live Discord API. That needs a real token and has not been tested.
+secret-free environment), LaTeX parsing and rendering (including every kind of result the calculator can produce),
+database migrations, configuration, message formatting, and the slash-command handlers driven with a stand-in
+interaction (real engine, real renderer).
+**Not covered:** behaviour against the live Discord API (needs a real token; test by hand).
+
+The first matplotlib run on a machine builds a font cache, which can take a while. The test suite and the bot's
+start-up each do this once with a long timeout; later runs are fast. The cache lives in `data/.cache/` (git-ignored).
 
 ## Roadmap
 
 1. ✅ Foundation + calculator (simplify, diff, solve)
-2. LaTeX rendering (matplotlib mathtext by default; matrices need an optional real-LaTeX backend) + remaining
-   calculator operations (factor, expand, integrate, limit, matrices, numeric evaluation)
+2. ✅ (2a) LaTeX rendering and `/latex`, including matrices. Next (2b): remaining calculator operations
+   (factor, expand, integrate, limit, matrices, numeric evaluation)
 3. Problem of the Day (question bank, hints, spoilers, streaks, restart-safe scheduler)
 4. Contests (individual first; answers never exposed before close)
 5. Newsletter (arXiv, dedupe, ranking, clearly labelled preprints vs. verified items)

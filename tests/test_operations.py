@@ -44,6 +44,11 @@ def test_diff_product_rule():
     assert "sin(x)" in text and "cos(x)" in text
 
 
+def test_diff_assumes_real_variables():
+    assert run("diff", expression="abs(x)").text == "sign(x)"
+    assert run("diff", expression="sqrt(x^2)").text == "sign(x)"
+
+
 def test_diff_requires_variable_when_ambiguous():
     with pytest.raises(InputError, match="several variables"):
         run("diff", expression="x*y")

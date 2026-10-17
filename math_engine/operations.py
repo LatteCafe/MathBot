@@ -23,9 +23,11 @@ def _approximation(expr) -> str | None:
     return None
 
 
-def _pick_variable(free: set, requested: str | None, *, allow_absent: bool = False) -> sympy.Symbol:
+def _pick_variable(free: set, requested: str | None, *, allow_absent: bool = False,
+                   real: bool = False) -> sympy.Symbol:
     if requested:
-        symbol = sympy.Symbol(validate_variable(requested))
+        name = validate_variable(requested)
+        symbol = sympy.Symbol(name, real=True) if real else sympy.Symbol(name)  # real=False would mean 'not real'
         if free and symbol not in free and not allow_absent:
             names = ", ".join(sorted(str(s) for s in free))
             raise InputError(f"The variable '{symbol}' does not appear in the expression (it contains: {names}).")
@@ -49,11 +51,13 @@ def diff(expression: str, variable: str | None = None, order: int = 1, *,
     if not isinstance(order, int) or not 1 <= order <= MAX_DERIVATIVE_ORDER:
         raise InputError(f"The derivative order must be between 1 and {MAX_DERIVATIVE_ORDER}.")
     expr = to_sympy(validate_expression(expression, max_length)[1])
-    var = _pick_variable(expr.free_symbols, variable, allow_absent=not expr.free_symbols)
+    # Variables are assumed real: otherwise d/dx |x| comes back as an unreadable piecewise in re(x), im(x).
+    expr = expr.xreplace({s: sympy.Symbol(s.name, real=True) for s in expr.free_symbols})
+    var = _pick_variable(expr.free_symbols, variable, allow_absent=not expr.free_symbols, real=True)
     result = sympy.simplify(sympy.diff(expr, var, order))
     return MathResult(
         text=pretty(str(result)), latex=sympy.latex(result), approximation=_approximation(result),
-        note=f"Derivative of order {order} with respect to {var}.",
+        note=f"Derivative of order {order} with respect to {var} (variables assumed real).",
     )
 
 
