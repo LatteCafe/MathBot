@@ -1,0 +1,13 @@
+"""Result type shared by the worker process and the bot (standard library only)."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass
+class MathResult:
+    text: str                       # human-readable exact result
+    latex: str | None = None        # LaTeX for the exact result (used for rendering in Phase 2)
+    approximation: str | None = None  # decimal approximation, only when it adds information
+    established: bool = True        # False when the result could NOT be established
+    note: str | None = None         # extra context, e.g. "solutions over the real numbers"

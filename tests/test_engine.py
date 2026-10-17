@@ -1,0 +1,44 @@
+"""End-to-end tests of the subprocess sandbox. Each test that spawns a worker takes about a second."""
+import pytest
+
+from math_engine.engine import MathEngine
+from math_engine.errors import ComputeFailed, ComputeTimeout, InputError
+
+
+async def test_runs_calculation_in_subprocess():
+    result = await MathEngine().run("simplify", expression="(x^2-1)/(x-1)")
+    assert result.text == "x + 1"
+
+
+async def test_input_errors_from_worker_surface_as_input_error():
+    with pytest.raises(InputError, match="several variables"):
+        await MathEngine().run("diff", expression="x*y")
+
+
+async def test_invalid_input_is_rejected_without_spawning_a_process(monkeypatch):
+    engine = MathEngine()
+
+    async def boom(*a, **k):
+        raise AssertionError("a worker process should not be spawned for invalid input")
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", boom)
+    with pytest.raises(InputError):
+        await engine.run("simplify", expression="__import__('os').system('ls')")
+
+
+async def test_timeout_kills_the_worker():
+    with pytest.raises(ComputeTimeout, match="took longer"):
+        await MathEngine(timeout=0.05).run("simplify", expression="x + 1")
+
+
+async def test_memory_limit_is_enforced_as_a_clean_failure():
+    with pytest.raises(ComputeFailed):
+        await MathEngine(memory_limit_mb=20).run("simplify", expression="x + 1")
+
+
+def test_worker_environment_does_not_contain_secrets(monkeypatch):
+    monkeypatch.setenv("DISCORD_TOKEN", "super-secret")
+    monkeypatch.setenv("SOME_API_KEY", "also-secret")
+    env = MathEngine()._build_env()
+    assert "DISCORD_TOKEN" not in env and "SOME_API_KEY" not in env
+    assert "super-secret" not in env.values()
