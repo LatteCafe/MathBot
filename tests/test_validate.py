@@ -67,3 +67,25 @@ def test_check_inputs_rejects_unknown_operation_and_bad_variable():
     with pytest.raises(InputError):
         check_inputs("diff", {"expression": "x^2", "variable": "xy"})
     check_inputs("solve", {"equation": "x^2 = 4"})
+
+
+def test_check_inputs_for_phase_2b_operations():
+    check_inputs("factor", {"expression": "x^2-1"})
+    check_inputs("integrate", {"expression": "x^2", "variable": "x", "lower": "0", "upper": "oo"})
+    check_inputs("integrate", {"expression": "x^2", "lower": None, "upper": None})
+    check_inputs("limit", {"expression": "sin(x)/x", "point": "0", "direction": "+"})
+    check_inputs("evaluate", {"expression": "pi", "digits": 20})
+
+
+@pytest.mark.parametrize("op,args", [
+    ("integrate", {"expression": "x", "lower": "0"}),
+    ("integrate", {"expression": "x", "upper": "1"}),
+    ("integrate", {"expression": "x", "lower": "__import__('os')", "upper": "1"}),
+    ("limit", {"expression": "x", "point": ""}),
+    ("limit", {"expression": "x", "point": "foo(1)"}),
+    ("evaluate", {"expression": ""}),
+    ("expand", {"expression": "9**9**9"}),
+])
+def test_check_inputs_rejects_bad_phase_2b_input(op, args):
+    with pytest.raises(InputError):
+        check_inputs(op, args)

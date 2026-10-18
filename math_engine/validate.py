@@ -36,9 +36,18 @@ _ALLOWED_CHARS = re.compile(r"^[A-Za-z0-9+\-*/().,\s]*$")
 _BIN_OPS = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)
 _UNARY_OPS = (ast.UAdd, ast.USub)
 
-# What the operations accept; used by the bot process to reject bad input before spawning a worker.
-EXPRESSION_ARGS = {"simplify": ["expression"], "diff": ["expression"]}
-EQUATION_ARGS = {"solve": ["equation"]}
+# Which arguments of each operation are expressions: (required, optional). Used by the bot process to
+# reject bad input before spawning a worker.
+OPERATION_ARGS = {
+    "simplify": (("expression",), ()),
+    "factor": (("expression",), ()),
+    "expand": (("expression",), ()),
+    "diff": (("expression",), ()),
+    "integrate": (("expression",), ("lower", "upper")),
+    "limit": (("expression", "point"), ()),
+    "evaluate": (("expression",), ()),
+}
+EQUATION_ARGS = {"solve": ("equation",)}
 
 
 def normalize(text: str) -> str:
@@ -100,9 +109,15 @@ def validate_variable(name: str) -> str:
 
 def check_inputs(op: str, args: dict, max_length: int = DEFAULT_MAX_LENGTH) -> None:
     """Cheap pre-check run in the bot process so invalid input never spawns a worker."""
-    if op in EXPRESSION_ARGS:
-        for key in EXPRESSION_ARGS[op]:
+    if op in OPERATION_ARGS:
+        required, optional = OPERATION_ARGS[op]
+        for key in required:
             validate_expression(args.get(key, ""), max_length)
+        for key in optional:
+            if args.get(key):
+                validate_expression(args[key], max_length)
+        if op == "integrate" and bool(args.get("lower")) != bool(args.get("upper")):
+            raise InputError("Give both a lower and an upper bound, or neither (for an indefinite integral).")
     elif op in EQUATION_ARGS:
         validate_equation(args.get("equation", ""), max_length)
     else:

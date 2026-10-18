@@ -18,6 +18,8 @@ def format_result(title: str, query: str, result: MathResult, *, has_image: bool
     lines = [f"**{title}** `{clean_inline(query)}`"]
     if not result.established:
         lines.append(f"⚠️ **Not established:** {result.text}")
+    elif result.approximate_only:
+        lines.append(f"**Approximate value:** `{clean_inline(result.text, 300)}`")
     elif has_image:
         if len(result.text) <= MAX_COPYABLE:
             lines.append(f"**Exact result** (plain text): `{clean_inline(result.text, MAX_COPYABLE)}`")
@@ -25,7 +27,7 @@ def format_result(title: str, query: str, result: MathResult, *, has_image: bool
             lines.append("**Exact result:** (see image)")
     else:
         lines.append(f"**Exact result:**\n```\n{clean_inline(result.text, 1200)}\n```")
-    if result.established and result.approximation:
+    if result.approximation and not result.approximate_only:
         lines.append(f"**Approximate (decimal):** `{clean_inline(result.approximation, 300)}`")
     if result.note:
         lines.append(f"*{result.note}*")

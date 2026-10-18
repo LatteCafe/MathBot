@@ -36,7 +36,7 @@ def test_error_formatting():
 
 def test_calc_cog_registers_expected_commands():
     names = {c.name for c in Calc(MathEngine()).get_app_commands()}
-    assert names == {"simplify", "diff", "solve"}
+    assert names == {"simplify", "factor", "expand", "diff", "integrate", "limit", "evaluate", "solve"}
 
 
 def test_with_image_the_exact_result_is_a_copyable_line_not_a_code_block():
@@ -88,3 +88,14 @@ async def test_calc_skips_rendering_when_there_is_nothing_to_draw():
     assert await calc._render_image(MathResult(text="x", latex=None)) is None
     assert await Calc(MathEngine(), None)._render_image(MathResult(text="x", latex="x")) is None
     assert renderer.calls == []
+
+
+def test_approximate_only_results_are_labelled_approximate_not_exact():
+    msg = format_result("Evaluate", "pi", MathResult(text="3.14159265358979", approximate_only=True))
+    assert "Approximate value" in msg and "Exact result" not in msg
+
+
+def test_limit_direction_choices_are_offered():
+    cmd = Calc(MathEngine()).limit
+    direction = next(p for p in cmd.parameters if p.name == "direction")
+    assert {c.value for c in direction.choices} == {"both", "+", "-"}

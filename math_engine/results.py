@@ -11,3 +11,4 @@ class MathResult:
     approximation: str | None = None  # decimal approximation, only when it adds information
     established: bool = True        # False when the result could NOT be established
     note: str | None = None         # extra context, e.g. "solutions over the real numbers"
+    approximate_only: bool = False  # True when `text` is itself a decimal approximation (e.g. /evaluate)

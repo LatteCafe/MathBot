@@ -57,6 +57,18 @@ class Calc(commands.Cog):
     async def simplify(self, interaction: discord.Interaction, expression: str) -> None:
         await self._run(interaction, "simplify", "Simplify", expression, expression=expression)
 
+    @app_commands.command(name="factor", description="Factor an expression over the rationals, e.g. x^2 - 1")
+    @app_commands.describe(expression="Expression to factor, e.g. x^3 - 6x^2 + 11x - 6")
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def factor(self, interaction: discord.Interaction, expression: str) -> None:
+        await self._run(interaction, "factor", "Factor", expression, expression=expression)
+
+    @app_commands.command(name="expand", description="Expand an expression, e.g. (x + 1)^3")
+    @app_commands.describe(expression="Expression to expand, e.g. (x+1)(x-1)")
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def expand(self, interaction: discord.Interaction, expression: str) -> None:
+        await self._run(interaction, "expand", "Expand", expression, expression=expression)
+
     @app_commands.command(name="diff", description="Differentiate an expression, e.g. x^3 * sin(x)")
     @app_commands.describe(
         expression="The expression to differentiate",
@@ -68,6 +80,46 @@ class Calc(commands.Cog):
                    variable: Optional[str] = None, order: app_commands.Range[int, 1, 5] = 1) -> None:
         await self._run(interaction, "diff", "Derivative of", expression,
                         expression=expression, variable=variable, order=order)
+
+    @app_commands.command(name="integrate", description="Integrate an expression (add bounds for a definite integral)")
+    @app_commands.describe(
+        expression="The integrand, e.g. x^2 or exp(-x^2)",
+        variable="Variable to integrate by (optional if there is only one)",
+        lower="Lower bound for a definite integral, e.g. 0 or -oo",
+        upper="Upper bound for a definite integral, e.g. 1, pi or oo (oo = infinity)",
+    )
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def integrate(self, interaction: discord.Interaction, expression: str, variable: Optional[str] = None,
+                        lower: Optional[str] = None, upper: Optional[str] = None) -> None:
+        query = f"{expression}  from {lower} to {upper}" if lower and upper else expression
+        await self._run(interaction, "integrate", "Integral of", query,
+                        expression=expression, variable=variable, lower=lower, upper=upper)
+
+    @app_commands.command(name="limit", description="Find a limit, e.g. sin(x)/x as x approaches 0")
+    @app_commands.describe(
+        expression="The expression, e.g. sin(x)/x",
+        point="The value the variable approaches, e.g. 0, pi or oo (oo = infinity)",
+        variable="Variable (optional if there is only one)",
+        direction="Approach from both sides (default), the right, or the left",
+    )
+    @app_commands.choices(direction=[
+        app_commands.Choice(name="both sides (default)", value="both"),
+        app_commands.Choice(name="from the right (x → a⁺)", value="+"),
+        app_commands.Choice(name="from the left (x → a⁻)", value="-"),
+    ])
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def limit(self, interaction: discord.Interaction, expression: str, point: str,
+                    variable: Optional[str] = None, direction: str = "both") -> None:
+        await self._run(interaction, "limit", "Limit of", expression,
+                        expression=expression, point=point, variable=variable, direction=direction)
+
+    @app_commands.command(name="evaluate", description="Numerically evaluate a constant expression, e.g. sqrt(2) + pi")
+    @app_commands.describe(expression="An expression with no variables, e.g. pi*e or sqrt(2)",
+                           digits="Significant digits, 1 to 50 (default 15)")
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def evaluate(self, interaction: discord.Interaction, expression: str,
+                       digits: app_commands.Range[int, 1, 50] = 15) -> None:
+        await self._run(interaction, "evaluate", "Evaluate", expression, expression=expression, digits=digits)
 
     @app_commands.command(name="solve", description="Solve an equation, e.g. x^2 - 4 = 0")
     @app_commands.describe(

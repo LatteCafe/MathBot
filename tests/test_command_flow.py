@@ -112,3 +112,52 @@ async def test_latex_command_handles_a_matrix(sandbox):
     i = FakeInteraction()
     await cog.latex.callback(cog, i, r"\begin{pmatrix}1&2\\3&4\end{pmatrix}")
     assert i.sent[0][1]["file"].filename == "latex.png"
+
+
+async def test_integrate_definite_sends_text_image_and_bounds(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.integrate.callback(calc, i, "exp(-x^2)", None, "-oo", "oo")
+    content, kw = i.sent[0]
+    assert "from -oo to oo" in content and "sqrt(pi)" in content and "1.77245385" in content
+    assert kw["file"].filename == "result.png"
+
+
+async def test_integrate_with_only_one_bound_is_a_friendly_error(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.integrate.callback(calc, i, "x", None, "0", None)
+    content, kw = i.sent[0]
+    assert content.startswith("❌") and "both a lower and an upper" in content and "file" not in kw
+
+
+async def test_limit_that_does_not_exist_says_so_and_has_no_image(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.limit.callback(calc, i, "1/x", "0", None, "both")
+    content, kw = i.sent[0]
+    assert "Does not exist" in content and "file" not in kw
+
+
+async def test_limit_via_the_command_with_a_direction(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.limit.callback(calc, i, "1/x", "0", None, "+")
+    assert "oo" in i.sent[0][0] and "from the right" in i.sent[0][0]
+
+
+async def test_evaluate_is_shown_as_an_approximation_without_an_image(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.evaluate.callback(calc, i, "pi", 20)
+    content, kw = i.sent[0]
+    assert "Approximate value" in content and "3.1415926535897932385" in content and "file" not in kw
+
+
+async def test_factor_and_expand_commands(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i1, i2 = FakeInteraction(), FakeInteraction()
+    await calc.factor.callback(calc, i1, "x^2-1")
+    await calc.expand.callback(calc, i2, "(x+1)^3")
+    assert "(x - 1)*(x + 1)" in i1.sent[0][0] and "file" in i1.sent[0][1]
+    assert "x^3 + 3*x^2 + 3*x + 1" in i2.sent[0][0]

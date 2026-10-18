@@ -45,3 +45,12 @@ def test_worker_environment_does_not_contain_secrets(monkeypatch):
     env = MathEngine()._build_env()
     assert "DISCORD_TOKEN" not in env and "SOME_API_KEY" not in env
     assert "super-secret" not in env.values()
+
+
+async def test_new_operations_work_through_the_subprocess_including_none_arguments():
+    engine = MathEngine()
+    r = await engine.run("integrate", expression="x^2", variable=None, lower="0", upper="3")
+    assert r.text == "9"
+    r = await engine.run("integrate", expression="x^2", variable=None, lower=None, upper=None)
+    assert r.text == "x^3/3"
+    assert (await engine.run("evaluate", expression="sqrt(2)", digits=10)).text == "1.414213562"

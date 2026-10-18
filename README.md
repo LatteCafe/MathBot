@@ -2,17 +2,22 @@
 
 A modular, free-to-run Discord bot for mathematics, built with `discord.py` and SymPy.
 
-**Status: Milestone 2a.** Implemented: project foundation, configuration, SQLite migrations, the symbolic
-calculator (`/simplify`, `/diff`, `/solve`), and LaTeX rendering (`/latex`, plus typeset calculator results).
-Not yet implemented: factor/expand/integrate/limit/matrix calculator operations, Problem of the Day, contests,
-newsletter (see the roadmap below).
+**Status: Milestone 2b (part 1).** Implemented: project foundation, configuration, SQLite migrations, the symbolic
+calculator (simplify, factor, expand, diff, integrate, limit, evaluate, solve), and LaTeX rendering (`/latex`, plus
+typeset calculator results). Not yet implemented: matrix operations, Problem of the Day, contests, newsletter
+(see the roadmap below).
 
 ## Commands
 
 | Command | Example | Notes |
 |---|---|---|
 | `/simplify expression` | `(x^2 - 1)/(x - 1)` | |
+| `/factor expression` | `x^3 - 6x^2 + 11x - 6` | over the rational numbers |
+| `/expand expression` | `(x+1)^3` | |
 | `/diff expression [variable] [order]` | `x^3 * sin(x)` | order 1–5; variable optional if only one |
+| `/integrate expression [variable] [lower] [upper]` | `exp(-x^2)`, lower `-oo`, upper `oo` | indefinite, or definite when both bounds are given |
+| `/limit expression point [variable] [direction]` | `sin(x)/x`, point `0` | direction: both sides (default), right, or left |
+| `/evaluate expression [digits]` | `sqrt(2) + pi` | numeric value, 1–50 significant digits; no variables allowed |
 | `/solve equation [variable] [domain]` | `x^2 - 4 = 0` | `real` (default) or `complex`; no `=` means "= 0" |
 | `/latex expression` | `\int_0^1 x^2\,dx` | renders LaTeX math as an image (see "LaTeX syntax" below) |
 | `/ping` | | liveness check |
@@ -26,6 +31,25 @@ Decimals are treated as exact fractions (`0.5` = `1/2`), so results stay exact.
 
 **Exact vs approximate:** exact results are always shown first; a decimal approximation is shown separately,
 and only when it adds information (e.g. for `sqrt(2)`, not for `3/4`).
+
+**How the new operations report their results**
+
+* `oo` means infinity (`-oo` for minus infinity); use it for bounds and limit points.
+* **Integrals.** Indefinite results are antiderivatives (add `+ C`; where a `log` argument is negative, use
+  `ln|argument|`). A definite integral that SymPy cannot evaluate, or that has a singularity inside the interval
+  (e.g. 1/x on [-1, 1]), is reported as **not established**, never guessed. A divergent integral is reported as
+  diverging. If a *real* integrand produces a *complex* answer, the result carries a branch-cut warning.
+* **Limits.** Two-sided limits compute both sides: if they disagree the bot says the limit does not exist and shows
+  both one-sided values (e.g. 1/x at 0). Oscillating limits (e.g. sin x as x → oo) are reported as not existing.
+  An infinite limit (1/x² at 0) is reported as infinite. Direction is ignored at ±oo.
+* **`/evaluate`** is always labelled approximate, except integers, which are shown as exact.
+* **`/factor`** works over the rationals and says when nothing factors (x² − 2 still factors over the reals).
+* Results that are too long to display are truncated and not typeset. Heavy expansions, integrals and limits that
+  exceed the time limit are stopped and reported as such.
+
+Deliberately **not** implemented: a numerical fallback for integrals SymPy cannot solve. Numerical integration
+returned garbage for divergent integrals and false alarms for correct ones in testing, so a "cross-check" would
+have been less trustworthy than saying nothing.
 
 **Variables:** `/diff` treats variables as real numbers (so d/dx |x| is `sign(x)`). `/solve` and `/simplify`
 use SymPy's default assumptions.
@@ -158,7 +182,7 @@ If every calculation fails with "stopped unexpectedly" on a small or ARM VM, try
 ## Tests
 
 ```bash
-python -m pytest              # whole suite (about 10 seconds)
+python -m pytest              # whole suite (about 20 seconds)
 python -m pytest -k validate  # just the input-validation tests
 ```
 
@@ -174,8 +198,8 @@ start-up each do this once with a long timeout; later runs are fast. The cache l
 ## Roadmap
 
 1. ✅ Foundation + calculator (simplify, diff, solve)
-2. ✅ (2a) LaTeX rendering and `/latex`, including matrices. Next (2b): remaining calculator operations
-   (factor, expand, integrate, limit, matrices, numeric evaluation)
+2. ✅ (2a) LaTeX rendering and `/latex`, including matrices. ✅ (2b, part 1) factor, expand, integrate, limit,
+   evaluate. Next (2b, part 2): matrix operations (determinant, inverse, transpose, products, rank, eigenvalues)
 3. Problem of the Day (question bank, hints, spoilers, streaks, restart-safe scheduler)
 4. Contests (individual first; answers never exposed before close)
 5. Newsletter (arXiv, dedupe, ranking, clearly labelled preprints vs. verified items)
