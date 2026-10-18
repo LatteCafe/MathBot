@@ -100,7 +100,7 @@ def _matrix_item(seg: MatrixSegment, measure: _Measurer, fontsize: float, fs_px:
     col_w = [max(cells[i][j][0] for i in range(nrows)) for j in range(ncols)]
     row_a = [max(0.7 * fs_px, max(c[1] for c in row)) for row in cells]   # minimum height keeps empty rows open
     row_d = [max(0.2 * fs_px, max(c[2] for c in row)) for row in cells]
-    col_gap, row_gap = 0.9 * fs_px, 0.35 * fs_px
+    col_gap, row_gap = 0.9 * fs_px, 0.5 * fs_px
     inner_w = sum(col_w) + col_gap * (ncols - 1)
     inner_h = sum(row_a) + sum(row_d) + row_gap * (nrows - 1)
     bw = 0.0 if seg.style == "none" else 0.55 * fs_px       # width reserved for each bracket

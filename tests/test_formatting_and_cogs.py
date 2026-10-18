@@ -36,7 +36,7 @@ def test_error_formatting():
 
 def test_calc_cog_registers_expected_commands():
     names = {c.name for c in Calc(MathEngine()).get_app_commands()}
-    assert names == {"simplify", "factor", "expand", "diff", "integrate", "limit", "evaluate", "solve"}
+    assert names == {"simplify", "factor", "expand", "diff", "integrate", "limit", "evaluate", "solve", "matrix"}
 
 
 def test_with_image_the_exact_result_is_a_copyable_line_not_a_code_block():
@@ -73,7 +73,7 @@ async def test_calc_attaches_an_image_when_rendering_works():
     renderer = FakeRenderer()
     picture = await Calc(MathEngine(), renderer)._render_image(MathResult(text="x + 1", latex="x + 1"))
     assert isinstance(picture, discord.File) and picture.filename == "result.png"
-    assert renderer.calls == [("x + 1", 1500)]
+    assert renderer.calls == [("x + 1", 3000)]
 
 
 @pytest.mark.parametrize("error", [InputError("unsupported"), ComputeTimeout("slow")])

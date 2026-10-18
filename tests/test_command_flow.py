@@ -161,3 +161,68 @@ async def test_factor_and_expand_commands(sandbox):
     await calc.expand.callback(calc, i2, "(x+1)^3")
     assert "(x - 1)*(x + 1)" in i1.sent[0][0] and "file" in i1.sent[0][1]
     assert "x^3 + 3*x^2 + 3*x + 1" in i2.sent[0][0]
+
+
+async def test_matrix_inverse_sends_text_and_a_typeset_matrix(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.matrix.callback(calc, i, "inverse", "[[1,2],[3,4]]", None)
+    content, kw = i.sent[0]
+    assert "Inverse of" in content and "[[-2, 1], [3/2, -1/2]]" in content
+    assert kw["file"].filename == "result.png"
+
+
+async def test_matrix_binary_operation_shows_both_operands_in_the_header(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.matrix.callback(calc, i, "multiply", "[[1,2],[3,4]]", "[[5,6],[7,8]]")
+    content, kw = i.sent[0]
+    assert "Product:" in content and "×" in content and "[[19, 22], [43, 50]]" in content and "file" in kw
+
+
+async def test_singular_matrix_inverse_has_a_clear_message_and_no_image(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.matrix.callback(calc, i, "inverse", "[[1,2],[2,4]]", None)
+    content, kw = i.sent[0]
+    assert "Not invertible" in content and "file" not in kw
+
+
+async def test_matrix_eigenvalues_with_approximations(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.matrix.callback(calc, i, "eigenvalues", "[[1,2],[3,4]]", None)
+    content, kw = i.sent[0]
+    assert "sqrt(33)" in content and "Approximate (decimal)" in content and "file" in kw
+
+
+@pytest.mark.parametrize("operation,a,b,fragment", [
+    ("determinant", "[[1,2,3]]", None, "square matrix"),
+    ("determinant", "[1,2,3]", None, "[[1, 2], [3, 4]]"),
+    ("determinant", "[[1,2],[3]]", None, "same number of entries"),
+    ("add", "[[1,2]]", "[[1],[2]]", "same size"),
+    ("add", "[[1,2]]", None, "second matrix"),
+    ("determinant", "[[1]]", "[[2]]", "only matrix A"),
+    ("determinant", "__import__('os')", None, "Unsupported character"),
+])
+async def test_matrix_errors_are_friendly(sandbox, operation, a, b, fragment):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.matrix.callback(calc, i, operation, a, b)
+    content, kw = i.sent[0]
+    assert content.startswith("❌") and fragment in content and "file" not in kw
+    assert "Traceback" not in content
+
+
+async def test_a_matrix_in_an_ordinary_command_points_to_the_matrix_command(sandbox):
+    calc = Calc(MathEngine(sandbox=sandbox), LatexRenderer(sandbox))
+    i = FakeInteraction()
+    await calc.simplify.callback(calc, i, "[[1,2],[3,4]]")
+    assert "/matrix" in i.sent[0][0]
+
+
+def test_matrix_operation_choices():
+    cmd = Calc(MathEngine()).matrix
+    operation = next(p for p in cmd.parameters if p.name == "operation")
+    assert {c.value for c in operation.choices} == {
+        "determinant", "inverse", "transpose", "trace", "rank", "rref", "eigenvalues", "add", "subtract", "multiply"}

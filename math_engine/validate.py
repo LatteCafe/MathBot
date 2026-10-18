@@ -49,6 +49,14 @@ OPERATION_ARGS = {
 }
 EQUATION_ARGS = {"solve": ("equation",)}
 
+# Matrix operations. A matrix is written as a list of rows: [[1, 2], [3, 4]].
+MATRIX_UNARY = ("determinant", "inverse", "transpose", "trace", "rank", "rref", "eigenvalues")
+MATRIX_BINARY = ("add", "subtract", "multiply")
+MAX_MATRIX_DIM = 6
+MATRIX_LENGTH_FACTOR = 4   # a matrix may be this many times longer than a single expression
+MAX_MATRIX_NODES = 600
+_MATRIX_CHARS = re.compile(r"^[A-Za-z0-9+\-*/().,\[\]\s]*$")
+
 
 def normalize(text: str) -> str:
     """Turn friendly notation into parseable Python-style syntax (``2x`` -> ``2*x``, ``^`` -> ``**``)."""
@@ -70,7 +78,8 @@ def validate_expression(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> tupl
     s = normalize(text)
     bad = next((c for c in s if not _ALLOWED_CHARS.match(c)), None)
     if bad is not None:
-        raise InputError(f"Unsupported character {bad!r}. Use numbers, letters, + - * / ^, parentheses and commas.")
+        hint = " For matrices, use the /matrix command." if bad in "[]" else ""
+        raise InputError(f"Unsupported character {bad!r}. Use numbers, letters, + - * / ^, parentheses and commas.{hint}")
     try:
         tree = ast.parse(s, mode="eval")
     except (SyntaxError, ValueError, RecursionError, MemoryError):
@@ -79,6 +88,55 @@ def validate_expression(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> tupl
         raise InputError("The expression is too complex.")
     _check(tree)
     return s, tree
+
+
+def validate_matrix(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> list[list[ast.AST]]:
+    """Validate a matrix written as ``[[1, 2], [3, 4]]``. Returns the entries as validated AST nodes.
+
+    Deliberately NOT part of the general expression grammar: brackets stay forbidden everywhere else. This
+    parser accepts exactly one shape (a list of equal-length lists), and then runs every entry through the same
+    whitelist as an ordinary expression.
+    """
+    limit = max_length * MATRIX_LENGTH_FACTOR
+    if not isinstance(text, str) or not text.strip():
+        raise InputError("The matrix is empty.")
+    if len(text) > limit:
+        raise InputError(f"The matrix is too long ({len(text)} characters; the limit is {limit}).")
+    s = normalize(text)
+    bad = next((c for c in s if not _MATRIX_CHARS.match(c)), None)
+    if bad is not None:
+        raise InputError(f"Unsupported character {bad!r} in the matrix. Entries may use numbers, letters, "
+                         "+ - * / ^, parentheses and commas.")
+    try:
+        tree = ast.parse(s, mode="eval")
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        raise InputError("Could not parse that matrix. Write it as [[1, 2], [3, 4]]: rows in brackets, "
+                         "separated by commas.") from None
+    if sum(1 for _ in ast.walk(tree)) > MAX_MATRIX_NODES:
+        raise InputError("The matrix is too complex.")
+
+    shape_hint = "Write a matrix as [[1, 2], [3, 4]]. A single row is [[1, 2, 3]]; a column is [[1], [2], [3]]."
+    body = tree.body
+    if not isinstance(body, ast.List) or not body.elts or not all(isinstance(r, ast.List) for r in body.elts):
+        raise InputError(shape_hint)
+    rows = [r.elts for r in body.elts]
+    width = len(rows[0])
+    if width == 0:
+        raise InputError("The matrix is empty.")
+    for i, row in enumerate(rows[1:], start=2):
+        if len(row) != width:
+            raise InputError(f"All rows must have the same number of entries (row 1 has {width}, row {i} has {len(row)}).")
+    if len(rows) > MAX_MATRIX_DIM or width > MAX_MATRIX_DIM:
+        raise InputError(f"Matrices larger than {MAX_MATRIX_DIM}x{MAX_MATRIX_DIM} are not supported "
+                         f"(this one is {len(rows)}x{width}).")
+    for row in rows:
+        for cell in row:
+            if isinstance(cell, ast.List):
+                raise InputError("Each entry must be a single number or expression; matrices cannot be nested.")
+            _check(cell)
+            if any(isinstance(n, ast.Name) and n.id == "oo" for n in ast.walk(cell)):
+                raise InputError("Infinity (oo) cannot be used inside a matrix.")
+    return rows
 
 
 def split_equation(text: str) -> tuple[str, str]:
@@ -109,6 +167,9 @@ def validate_variable(name: str) -> str:
 
 def check_inputs(op: str, args: dict, max_length: int = DEFAULT_MAX_LENGTH) -> None:
     """Cheap pre-check run in the bot process so invalid input never spawns a worker."""
+    if op == "matrix":
+        _check_matrix_inputs(args, max_length)
+        return
     if op in OPERATION_ARGS:
         required, optional = OPERATION_ARGS[op]
         for key in required:
@@ -124,6 +185,26 @@ def check_inputs(op: str, args: dict, max_length: int = DEFAULT_MAX_LENGTH) -> N
         raise InputError(f"Unknown operation {op!r}.")
     if args.get("variable"):
         validate_variable(args["variable"])
+
+
+def _check_matrix_inputs(args: dict, max_length: int) -> None:
+    operation = args.get("operation")
+    if operation not in MATRIX_UNARY + MATRIX_BINARY:
+        raise InputError(f"Unknown matrix operation {operation!r}.")
+    validate_matrix(args.get("a", ""), max_length)
+    b = args.get("b")
+    if operation in MATRIX_UNARY:
+        if b:
+            raise InputError("This operation uses only matrix A; leave B empty.")
+        return
+    if not b or not b.strip():
+        raise InputError("This operation needs a second matrix B.")
+    if b.strip().startswith("["):
+        validate_matrix(b, max_length)
+    elif operation == "multiply":
+        validate_expression(b, max_length)   # a plain number or expression: scalar multiplication
+    else:
+        raise InputError("B must be a matrix such as [[1, 2], [3, 4]] for addition and subtraction.")
 
 
 # --------------------------------------------------------------------------- AST whitelist

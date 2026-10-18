@@ -2,9 +2,9 @@
 
 A modular, free-to-run Discord bot for mathematics, built with `discord.py` and SymPy.
 
-**Status: Milestone 2b (part 1).** Implemented: project foundation, configuration, SQLite migrations, the symbolic
-calculator (simplify, factor, expand, diff, integrate, limit, evaluate, solve), and LaTeX rendering (`/latex`, plus
-typeset calculator results). Not yet implemented: matrix operations, Problem of the Day, contests, newsletter
+**Status: Milestone 2 complete.** Implemented: project foundation, configuration, SQLite migrations, the symbolic
+calculator (simplify, factor, expand, diff, integrate, limit, evaluate, solve, matrices), and LaTeX rendering
+(`/latex`, plus typeset calculator results). Not yet implemented: Problem of the Day, contests, newsletter
 (see the roadmap below).
 
 ## Commands
@@ -19,6 +19,7 @@ typeset calculator results). Not yet implemented: matrix operations, Problem of 
 | `/limit expression point [variable] [direction]` | `sin(x)/x`, point `0` | direction: both sides (default), right, or left |
 | `/evaluate expression [digits]` | `sqrt(2) + pi` | numeric value, 1–50 significant digits; no variables allowed |
 | `/solve equation [variable] [domain]` | `x^2 - 4 = 0` | `real` (default) or `complex`; no `=` means "= 0" |
+| `/matrix operation a [b]` | `inverse` of `[[1,2],[3,4]]` | determinant, inverse, transpose, trace, rank, rref, eigenvalues, add, subtract, multiply (see "Matrices") |
 | `/latex expression` | `\int_0^1 x^2\,dx` | renders LaTeX math as an image (see "LaTeX syntax" below) |
 | `/ping` | | liveness check |
 
@@ -31,6 +32,35 @@ Decimals are treated as exact fractions (`0.5` = `1/2`), so results stay exact.
 
 **Exact vs approximate:** exact results are always shown first; a decimal approximation is shown separately,
 and only when it adds information (e.g. for `sqrt(2)`, not for `3/4`).
+
+## Matrices (`/matrix`)
+
+Write a matrix as a list of rows: `[[1, 2], [3, 4]]`. A row is `[[1, 2, 3]]` and a column is `[[1], [2], [3]]`.
+Entries can be numbers, fractions, or expressions (`[[1/2, sqrt(2)], [x^2, 0]]`).
+
+| Operation | Notes |
+|---|---|
+| determinant, inverse, trace, eigenvalues | square matrices only |
+| transpose, rank, rref (reduced row echelon form, with pivot columns) | any shape |
+| add, subtract | A and B must be the same size |
+| multiply | A × B needs columns of A = rows of B; B may instead be a number or expression (scalar multiple) |
+
+* **Results can be pasted straight back in.** The plain-text result of an operation (`[[-2, 1], [3/2, -1/2]]`) is a
+  valid input to the next one, so operations chain: the inverse of the inverse is the original.
+* **Limits:** numeric matrices up to 6×6; matrices containing variables up to 4×4 (a fully symbolic 5×5
+  determinant takes seconds and a 6×6 takes minutes). Entries cannot contain infinity.
+* **Inverse:** a singular matrix is reported as "not invertible" (determinant 0), not an error. For a symbolic
+  matrix the result states the determinant it is valid for.
+* **Eigenvalues** (over the complex numbers) come from the characteristic polynomial factored over the rationals.
+  Factors of degree 1 and 2 give exact values, including multiplicities and `I` for complex ones. An irreducible
+  factor of degree 3 or higher is shown as decimal approximations (`≈`) of the roots of that named polynomial,
+  because SymPy's own closed form for those is unreadable (a cubic with three *real* roots comes back full of
+  complex numbers). If the eigenvalues cannot be found at all (e.g. a 3×3 with a variable in it) the result is
+  "not established", never a guess.
+* **Rank and rref of a matrix with variables** hold for *generic* values of the variables; special values can
+  change them, and the result says so.
+* Matrices are drawn with this project's own layout code (`rendering/draw.py`), so results come back as proper
+  bracketed matrices. Brackets remain invalid in every other command; those point you to `/matrix`.
 
 **How the new operations report their results**
 
@@ -182,11 +212,12 @@ If every calculation fails with "stopped unexpectedly" on a small or ARM VM, try
 ## Tests
 
 ```bash
-python -m pytest              # whole suite (about 20 seconds)
+python -m pytest              # whole suite (about 25 seconds)
 python -m pytest -k validate  # just the input-validation tests
 ```
 
-Covered: input validation (accept/reject lists), SymPy operations, the subprocess sandbox (timeout, memory limit,
+Covered: input validation (accept/reject lists), SymPy operations (matrix results are additionally checked
+against NumPy's eigenvalue solver and against identities such as A·A⁻¹ = I and det(AB) = det(A)·det(B)), the subprocess sandbox (timeout, memory limit,
 secret-free environment), LaTeX parsing and rendering (including every kind of result the calculator can produce),
 database migrations, configuration, message formatting, and the slash-command handlers driven with a stand-in
 interaction (real engine, real renderer).
@@ -198,8 +229,7 @@ start-up each do this once with a long timeout; later runs are fast. The cache l
 ## Roadmap
 
 1. ✅ Foundation + calculator (simplify, diff, solve)
-2. ✅ (2a) LaTeX rendering and `/latex`, including matrices. ✅ (2b, part 1) factor, expand, integrate, limit,
-   evaluate. Next (2b, part 2): matrix operations (determinant, inverse, transpose, products, rank, eigenvalues)
+2. ✅ LaTeX rendering and `/latex` (incl. matrices); ✅ factor, expand, integrate, limit, evaluate; ✅ `/matrix`
 3. Problem of the Day (question bank, hints, spoilers, streaks, restart-safe scheduler)
 4. Contests (individual first; answers never exposed before close)
 5. Newsletter (arXiv, dedupe, ranking, clearly labelled preprints vs. verified items)

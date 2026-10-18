@@ -54,3 +54,18 @@ async def test_new_operations_work_through_the_subprocess_including_none_argumen
     r = await engine.run("integrate", expression="x^2", variable=None, lower=None, upper=None)
     assert r.text == "x^3/3"
     assert (await engine.run("evaluate", expression="sqrt(2)", digits=10)).text == "1.414213562"
+
+
+async def test_matrix_operation_through_the_subprocess():
+    engine = MathEngine()
+    assert (await engine.run("matrix", operation="determinant", a="[[1,2],[3,4]]", b=None)).text == "-2"
+    assert (await engine.run("matrix", operation="eigenvalues", a="[[2,0],[0,3]]", b=None)).text == "λ = 2, λ = 3"
+
+
+async def test_invalid_matrix_input_does_not_spawn_a_worker(monkeypatch):
+    async def boom(*a, **k):
+        raise AssertionError("no worker should be spawned")
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", boom)
+    with pytest.raises(InputError):
+        await MathEngine().run("matrix", operation="determinant", a="[[__import__('os')]]", b=None)

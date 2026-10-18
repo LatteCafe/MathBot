@@ -16,8 +16,14 @@ from rendering.renderer import LatexRenderer
 from .formatting import format_error, format_result
 
 log = logging.getLogger(__name__)
+MATRIX_TITLES = {
+    "determinant": "Determinant of", "inverse": "Inverse of", "transpose": "Transpose of", "trace": "Trace of",
+    "rank": "Rank of", "rref": "Row-reduced form of", "eigenvalues": "Eigenvalues of",
+    "add": "Sum:", "subtract": "Difference:", "multiply": "Product:",
+}
+MATRIX_SYMBOLS = {"add": "+", "subtract": "−", "multiply": "×"}
 COOLDOWN = dict(rate=1, per=3.0, key=lambda i: i.user.id)  # one calculation per user per 3 seconds
-RESULT_LATEX_MAX = 1500  # results can be longer than what users are allowed to type into /latex
+RESULT_LATEX_MAX = 3000  # results can be longer than what users are allowed to type into /latex
 
 
 class Calc(commands.Cog):
@@ -120,6 +126,30 @@ class Calc(commands.Cog):
     async def evaluate(self, interaction: discord.Interaction, expression: str,
                        digits: app_commands.Range[int, 1, 50] = 15) -> None:
         await self._run(interaction, "evaluate", "Evaluate", expression, expression=expression, digits=digits)
+
+    @app_commands.command(name="matrix", description="Matrix operations, e.g. the determinant of [[1,2],[3,4]]")
+    @app_commands.describe(
+        operation="What to compute",
+        a="Matrix A as rows in brackets, e.g. [[1,2],[3,4]]. Entries can contain variables (up to 4x4).",
+        b="Matrix B (or a plain number, for multiply) for add, subtract and multiply",
+    )
+    @app_commands.choices(operation=[
+        app_commands.Choice(name="determinant", value="determinant"),
+        app_commands.Choice(name="inverse", value="inverse"),
+        app_commands.Choice(name="transpose", value="transpose"),
+        app_commands.Choice(name="trace", value="trace"),
+        app_commands.Choice(name="rank", value="rank"),
+        app_commands.Choice(name="row-reduced form (rref)", value="rref"),
+        app_commands.Choice(name="eigenvalues", value="eigenvalues"),
+        app_commands.Choice(name="add: A + B", value="add"),
+        app_commands.Choice(name="subtract: A − B", value="subtract"),
+        app_commands.Choice(name="multiply: A × B (B may be a number)", value="multiply"),
+    ])
+    @app_commands.checks.cooldown(**COOLDOWN)
+    async def matrix(self, interaction: discord.Interaction, operation: str, a: str, b: Optional[str] = None) -> None:
+        query = f"{a} {MATRIX_SYMBOLS[operation]} {b}" if operation in MATRIX_SYMBOLS and b else a
+        await self._run(interaction, "matrix", MATRIX_TITLES.get(operation, "Matrix"), query,
+                        operation=operation, a=a, b=b)
 
     @app_commands.command(name="solve", description="Solve an equation, e.g. x^2 - 4 = 0")
     @app_commands.describe(

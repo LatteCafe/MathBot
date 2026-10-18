@@ -20,6 +20,11 @@ FUNCTIONS = {
 CONSTANTS = {"pi": sympy.pi, "e": sympy.E, "oo": sympy.oo}
 
 
+def to_sympy_matrix(rows) -> sympy.Matrix:
+    """Convert the validated entries from ``validate_matrix`` into a SymPy Matrix."""
+    return sympy.Matrix([[to_sympy(cell) for cell in row] for row in rows])
+
+
 def to_sympy(node: ast.AST) -> sympy.Expr:
     expr = _convert(node)
     if expr.has(sympy.zoo, sympy.nan):
