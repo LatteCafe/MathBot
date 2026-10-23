@@ -5,6 +5,9 @@ Principle: never present a result as established when it is not. SymPy signals t
 """
 from __future__ import annotations
 
+import math
+import sys
+
 import sympy
 
 from .convert import to_sympy, to_sympy_matrix
@@ -15,9 +18,17 @@ from .validate import (DEFAULT_MAX_LENGTH, MATRIX_BINARY, MATRIX_UNARY, validate
 
 MAX_DERIVATIVE_ORDER = 5
 MAX_DIGITS = 50
-MAX_RESULT_CHARS = 4000   # longer results are truncated (and not typeset)
+MAX_RESULT_CHARS = 100_000   # a result longer than this is cut off (and never typeset)
+SUMMARY_CHARS = 300          # results longer than this (or integers with more than ~30 digits) get a summary
+LATEX_TEXT_CHARS = 1500      # only results this short are typeset
 MAX_LATEX_CHARS = 3000
+BIG_INTEGER_BITS = 100       # about 30 digits
 MAX_SYMBOLIC_MATRIX_DIM = 4  # a fully symbolic 5x5 determinant takes seconds and a 6x6 minutes, so cap those
+# Python refuses by default to print integers of more than 4,300 digits (a denial-of-service guard), which would turn a
+# legitimate 5,000-digit result into a crash. This module only runs inside the sandboxed worker (and tests), so
+# raise the limit to our own explicit one; anything bigger is summarised instead of printed.
+if hasattr(sys, "set_int_max_str_digits"):
+    sys.set_int_max_str_digits(MAX_RESULT_CHARS)
 NOT_AN_ANSWER = "That does NOT mean there is no answer, only that SymPy could not establish one."
 
 
@@ -40,15 +51,54 @@ def _join(*notes: str | None) -> str | None:
     return " ".join(n for n in notes if n) or None
 
 
+def _digit_count(n: int) -> int:
+    n = abs(n)
+    if n.bit_length() < 3000:
+        return len(str(n))
+    return int(math.log10(n)) + 1        # exact conversion is too slow here; the count is right to within rounding
+
+
+def _is_big_integer(value) -> bool:
+    return value.is_Integer and abs(int(value)).bit_length() > BIG_INTEGER_BITS
+
+
+def _summary(value, text: str | None) -> str:
+    """A one-line description of a result too big to read in full."""
+    if value.is_Integer:
+        n = abs(int(value))
+        sign = "negative " if value < 0 else ""
+        return (f"{sign}integer with {_digit_count(n):,} digits, about {str(sympy.N(abs(value), 8)).replace('E', 'e')}, "
+                f"ending in …{n % 10**8:08d}")
+    if value.is_Rational:
+        return (f"fraction whose numerator has {_digit_count(int(value.p)):,} digits "
+                f"and denominator {_digit_count(int(value.q)):,} digits")
+    if value.is_Add:
+        return f"sum of {len(value.args):,} terms"
+    if value.is_Mul:
+        return f"product of {len(value.args):,} factors"
+    return f"expression of {len(text):,} characters" if text else "very large expression"
+
+
 def _make(result, note: str | None = None) -> MathResult:
-    """Build a MathResult from a SymPy expression, guarding against enormous output."""
-    text = pretty(str(result))
-    if len(text) > MAX_RESULT_CHARS:
-        return MathResult(text=text[:MAX_RESULT_CHARS] + "…", latex=None, approximation=None,
-                          note=_join(note, "The result is too long to show in full."))
-    latex = sympy.latex(result)
-    return MathResult(text=text, latex=latex if len(latex) <= MAX_LATEX_CHARS else None,
-                      approximation=_approximation(result), note=note)
+    """Build a MathResult from a SymPy expression, recognising results too large to display."""
+    try:
+        text = pretty(str(result))
+    except ValueError:                    # an integer with more digits than we are willing to print
+        text = None
+    truncated = text is None or len(text) > MAX_RESULT_CHARS
+    summary = _summary(result, text) if truncated or len(text) > SUMMARY_CHARS or _is_big_integer(result) else None
+    if text is None:
+        text = f"<{summary}>"
+    elif truncated:
+        text = text[:MAX_RESULT_CHARS]
+    latex = None
+    if not truncated and len(text) <= LATEX_TEXT_CHARS:
+        latex = sympy.latex(result)
+        latex = latex if len(latex) <= MAX_LATEX_CHARS else None
+    if truncated:
+        note = _join(note, f"The result is longer than {MAX_RESULT_CHARS:,} characters, so it is cut off.")
+    return MathResult(text=text, latex=latex, approximation=None if truncated else _approximation(result), note=note,
+                      summary=summary, truncated=truncated)
 
 
 def _not_established(text: str, note: str) -> MathResult:
@@ -204,7 +254,7 @@ def evaluate(expression: str, digits: int = 15, *, max_length: int = DEFAULT_MAX
         raise InputError(f"This expression contains variables ({names}), so it has no single numerical value. "
                          "Use /simplify, or replace the variables with numbers.")
     if expr.is_Integer or not expr.is_finite:
-        return MathResult(text=pretty(str(expr)), note="Exact value." if expr.is_Integer else None)
+        return _make(expr, "Exact value." if expr.is_Integer else None)
     return MathResult(text=str(sympy.N(expr, digits)), approximate_only=True,
                       note=f"Numerical approximation to {digits} significant digits.")
 
@@ -232,11 +282,24 @@ def _matrix_latex(M: sympy.Matrix) -> str:
 def _make_matrix(M: sympy.Matrix, note: str | None = None) -> MathResult:
     if M.free_symbols:
         M = M.applyfunc(sympy.simplify)
-    text = _matrix_text(M)
-    if len(text) > MAX_RESULT_CHARS:
-        return MathResult(text=text[:MAX_RESULT_CHARS] + "…", note=_join(note, "The result is too long to show in full."))
-    latex = _matrix_latex(M)
-    return MathResult(text=text, latex=latex if len(latex) <= MAX_LATEX_CHARS else None, note=note)
+    try:
+        text = _matrix_text(M)
+    except ValueError:                    # an entry with more digits than we are willing to print
+        text = None
+    truncated = text is None or len(text) > MAX_RESULT_CHARS
+    summary = f"{M.rows}×{M.cols} matrix" + (f" ({len(text):,} characters)" if text else " with enormous entries") \
+        if truncated or len(text) > SUMMARY_CHARS else None
+    if text is None:
+        text = f"<{summary}>"
+    elif truncated:
+        text = text[:MAX_RESULT_CHARS]
+    latex = None
+    if not truncated and len(text) <= LATEX_TEXT_CHARS:
+        latex = _matrix_latex(M)
+        latex = latex if len(latex) <= MAX_LATEX_CHARS else None
+    if truncated:
+        note = _join(note, f"The result is longer than {MAX_RESULT_CHARS:,} characters, so it is cut off.")
+    return MathResult(text=text, latex=latex, note=note, summary=summary, truncated=truncated)
 
 
 def _require_square(M: sympy.Matrix, what: str) -> None:
@@ -391,6 +454,26 @@ def matrix(operation: str, a: str, b: str | None = None, *, max_length: int = DE
     return _m_binary(operation, A, b, max_length)
 
 
+def _equal(a, b) -> bool:
+    if a == b:
+        return True
+    if a.has(sympy.oo, -sympy.oo, sympy.zoo, sympy.nan) or b.has(sympy.oo, -sympy.oo, sympy.zoo, sympy.nan):
+        return False                      # infinities are only "equal" when structurally identical (checked above)
+    diff = a - b
+    if diff.is_Rational:
+        return diff == 0                  # exact arithmetic: two different rationals are never "close enough"
+    if not diff.free_symbols:
+        # Irrational constants: compare to 60 digits. Two different closed forms agreeing to 40 digits is not a realistic risk.
+        return bool(abs(sympy.N(diff, 60)) < sympy.Float("1e-40", 60))
+    return sympy.simplify(diff) == 0
+
+
+def equivalent(submitted: str, expected: str, *, max_length: int = DEFAULT_MAX_LENGTH) -> MathResult:
+    """Are two expressions equal? Used to grade answers, so '2*pi/8' and 'pi/4' both match 'pi/4'."""
+    same = _equal(_parse(submitted, max_length), _parse(expected, max_length))
+    return MathResult(text="equal" if same else "different")
+
+
 def solve(equation: str, variable: str | None = None, domain: str = "real", *,
           max_length: int = DEFAULT_MAX_LENGTH) -> MathResult:
     if domain not in ("real", "complex"):
@@ -428,6 +511,7 @@ def solve(equation: str, variable: str | None = None, domain: str = "real", *,
 OPERATIONS = {
     "simplify": simplify, "factor": factor, "expand": expand, "diff": diff,
     "integrate": integrate, "limit": limit, "evaluate": evaluate, "solve": solve, "matrix": matrix,
+    "equivalent": equivalent,
 }
 
 

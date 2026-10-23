@@ -228,7 +228,7 @@ def test_evaluate_rejects_variables_and_bad_digits():
             run("evaluate", expression="pi", digits=digits)
 
 
-def test_very_long_results_are_truncated_and_not_typeset():
+def test_very_long_results_are_cut_off_summarised_and_not_typeset():
     r = run("expand", expression="(x+y+z+1)^40")
-    assert len(r.text) <= operations.MAX_RESULT_CHARS + 1
-    assert r.latex is None and "too long" in r.note
+    assert len(r.text) <= operations.MAX_RESULT_CHARS and r.truncated and r.latex is None
+    assert r.summary == "sum of 12,341 terms" and "cut off" in r.note

@@ -151,3 +151,30 @@ def test_check_inputs_for_the_matrix_operation():
 def test_check_inputs_rejects_bad_matrix_requests(args):
     with pytest.raises(InputError):
         check_inputs("matrix", args)
+
+
+# ============================================================ decimals that Python would silently round
+
+@pytest.mark.parametrize("text", [
+    "0.1", "3.14159265358979", "0.123456789012345", "1.500000000000000000", "100.0", "0.000000000000000000123",
+    "2.5*x", ".5", "5.", "123456789.123456",
+])
+def test_decimals_that_survive_float_parsing_are_accepted(text):
+    validate_expression(text)
+
+
+@pytest.mark.parametrize("text", [
+    "1.0000000000000000000000000000000000000000001", "0.1234567890123456", "3.141592653589793238", "10.0000000000000001",
+    "x + 0.12345678901234567",
+])
+def test_decimals_with_too_many_digits_are_rejected_with_an_explanation(text):
+    with pytest.raises(InputError, match="significant digits"):
+        validate_expression(text)
+
+
+def test_the_same_rule_applies_inside_matrices_and_equations():
+    with pytest.raises(InputError, match="significant digits"):
+        validate_matrix("[[0.1234567890123456, 1]]")
+    with pytest.raises(InputError, match="significant digits"):
+        check_inputs("solve", {"equation": "x = 0.1234567890123456"})
+    validate_matrix("[[0.5, 1.25]]")

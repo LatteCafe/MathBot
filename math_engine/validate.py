@@ -22,6 +22,7 @@ DEFAULT_MAX_LENGTH = 200
 MAX_NODES = 120
 MAX_NUMBER = 10**12        # largest literal accepted
 MAX_EXPONENT = 1000        # largest numeric exponent accepted
+MAX_DECIMAL_DIGITS = 15    # a decimal with more significant digits cannot survive Python's float parsing
 MAX_RESULT_BITS = 20_000   # largest constant power result we allow SymPy to compute
 
 ALLOWED_FUNCTIONS = frozenset(
@@ -46,6 +47,7 @@ OPERATION_ARGS = {
     "integrate": (("expression",), ("lower", "upper")),
     "limit": (("expression", "point"), ()),
     "evaluate": (("expression",), ()),
+    "equivalent": (("submitted", "expected"), ()),
 }
 EQUATION_ARGS = {"solve": ("equation",)}
 
@@ -69,6 +71,18 @@ def normalize(text: str) -> str:
     return s
 
 
+def _check_decimal_precision(s: str) -> None:
+    """Reject decimals that would be silently rounded. Python parses literals as 64-bit floats, so anything past
+    ~15 significant digits would change value without warning (1.0000000000000000000001 would become 1)."""
+    for match in re.finditer(r"\d+\.\d*|\.\d+", s):
+        digits = match.group().replace(".", "").strip("0")
+        if len(digits) > MAX_DECIMAL_DIGITS:
+            raise InputError(
+                f"The decimal {match.group()[:30]!r} has more than {MAX_DECIMAL_DIGITS} significant digits and would "
+                "be silently rounded. Use a fraction instead (for example 1/3), or fewer digits."
+            )
+
+
 def validate_expression(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> tuple[str, ast.Expression]:
     """Validate one expression. Returns (normalised text, AST). Raises InputError if unsafe/invalid."""
     if not isinstance(text, str) or not text.strip():
@@ -80,6 +94,7 @@ def validate_expression(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> tupl
     if bad is not None:
         hint = " For matrices, use the /matrix command." if bad in "[]" else ""
         raise InputError(f"Unsupported character {bad!r}. Use numbers, letters, + - * / ^, parentheses and commas.{hint}")
+    _check_decimal_precision(s)
     try:
         tree = ast.parse(s, mode="eval")
     except (SyntaxError, ValueError, RecursionError, MemoryError):
@@ -107,6 +122,7 @@ def validate_matrix(text: str, max_length: int = DEFAULT_MAX_LENGTH) -> list[lis
     if bad is not None:
         raise InputError(f"Unsupported character {bad!r} in the matrix. Entries may use numbers, letters, "
                          "+ - * / ^, parentheses and commas.")
+    _check_decimal_precision(s)
     try:
         tree = ast.parse(s, mode="eval")
     except (SyntaxError, ValueError, RecursionError, MemoryError):

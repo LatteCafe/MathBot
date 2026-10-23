@@ -1,0 +1,721 @@
+# Problem of the Day bank.
+#
+# All problems are original or classical results written for this bot. Levels (none is school-level):
+#   core       upper-division course material; a student who has taken the course can solve it in 10-20 minutes
+#   advanced   competition-style; needs a real idea or a careful multi-step argument
+#   challenge  hard (Putnam-hard or graduate flavoured); may take hours
+#
+# Fields:
+#   id             unique slug (letters, digits, hyphens)
+#   subject        analysis | abstract_algebra | linear_algebra | number_theory | combinatorics |
+#                  probability | complex_analysis | topology | geometry
+#   level          core | advanced | challenge
+#   title          short, shown in the post
+#   statement      plain text / Unicode (Discord cannot render LaTeX in text)
+#   display        optional LaTeX, typeset as an image under the statement (see /latex for the supported subset)
+#   answer_type    value (exact number or closed form, checked symbolically) | choice (a letter; needs `options`)
+#   answer         machine-readable, using the calculator's syntax (pi, e, sqrt, ln, ^ ...)
+#   answer_display optional human-readable form shown with the solution (defaults to `answer`)
+#   answer_format  optional hint shown in the answer box
+#   max_attempts   optional limit on guesses (choice problems default to 2)
+#   hints          0-3 progressively stronger hints
+#   solution       worked solution, shown only when the user asks for it
+#
+# Every answer here is recomputed independently in tests/test_problem_answers.py.
+
+problems:
+
+# ============================================================================= CORE
+
+- id: ana-factorial-root
+  subject: analysis
+  level: core
+  title: A limit with factorials
+  statement: Evaluate the limit.
+  display: '\lim_{n\to\infty} \frac{(n!)^{1/n}}{n}'
+  answer_type: value
+  answer: 1/e
+  hints:
+    - "Take logarithms: the logarithm of the quantity is (1/n)·Σ ln k − ln n = (1/n)·Σ ln(k/n)."
+    - "That is a Riemann sum. What is ∫₀¹ ln x dx?"
+  solution: |-
+    ln[(n!)^{1/n}/n] = (1/n)·Σ_{k=1}^{n} ln(k/n). This is a Riemann sum for ∫₀¹ ln x dx, and because ln is monotone the sums converge to the (convergent, improper) integral, which equals −1.
+    Hence the limit is e^{−1} = 1/e.
+
+- id: ana-radius-central
+  subject: analysis
+  level: core
+  title: A radius of convergence
+  statement: Find the radius of convergence of the power series.
+  display: '\sum_{n=0}^{\infty} \frac{(3n)!}{(n!)^{3}}\, x^{n}'
+  answer_type: value
+  answer: 1/27
+  hints:
+    - "Use the ratio test and simplify a_{n+1}/a_n completely."
+    - "The ratio is (3n+3)(3n+2)(3n+1)/(n+1)³. What does it tend to?"
+  solution: |-
+    With a_n = (3n)!/(n!)³ we get a_{n+1}/a_n = (3n+3)(3n+2)(3n+1)/(n+1)³ = 3(3n+2)(3n+1)/(n+1)² → 27.
+    So the radius of convergence is 1/27.
+
+- id: ana-l2-projection
+  subject: analysis
+  level: core
+  title: Best linear approximation of x²
+  statement: Find the minimum value of the integral over all real numbers a and b.
+  display: '\min_{a,b\in\mathbb{R}} \int_{0}^{1} \left(x^{2}-a-bx\right)^{2}\,dx'
+  answer_type: value
+  answer: 1/180
+  hints:
+    - "This is the squared distance from x² to span{1, x} in L²[0,1]."
+    - "Use the orthogonal basis 1, x − 1/2, and compute the projection coefficients."
+  solution: |-
+    Project x² onto span{1, x − 1/2} (orthogonal in L²[0,1], with ‖x − 1/2‖² = 1/12).
+    ⟨x², 1⟩ = 1/3 and ⟨x², x − 1/2⟩ = 1/4 − 1/6 = 1/12, so the projection is 1/3 + (x − 1/2).
+    The residual is x² − x + 1/6 = t² − 1/12 with t = x − 1/2, so the minimum is ∫_{−1/2}^{1/2} (t² − 1/12)² dt = 2·(1/160 − 1/144 + 1/288) = 1/180.
+
+- id: alg-order5-s7
+  subject: abstract_algebra
+  level: core
+  title: Elements of order 5
+  statement: How many elements of order 5 does the symmetric group S₇ have?
+  answer_type: value
+  answer: "504"
+  answer_format: An integer
+  hints:
+    - "The order of a permutation is the lcm of its cycle lengths."
+    - "Which cycle types on 7 points have lcm exactly 5?"
+  solution: |-
+    The lcm of the cycle lengths must be 5, so the only possibility is a single 5-cycle with two fixed points (a 5-cycle together with a 2-cycle has order 10).
+    Choose the 5 moved points in C(7,5) = 21 ways and a cyclic order on them in 4! = 24 ways: 21 · 24 = 504.
+
+- id: alg-aut-z6z6
+  subject: abstract_algebra
+  level: core
+  title: An automorphism group
+  statement: Find the order of the automorphism group of ℤ/6ℤ × ℤ/6ℤ.
+  answer_type: value
+  answer: "288"
+  answer_format: An integer
+  hints:
+    - "Split into Sylow subgroups: ℤ/6 × ℤ/6 ≅ (ℤ/2)² × (ℤ/3)²."
+    - "An automorphism preserves each Sylow subgroup, so Aut is a product of two general linear groups."
+  solution: |-
+    Aut(ℤ/6 × ℤ/6) ≅ Aut((ℤ/2)²) × Aut((ℤ/3)²) = GL₂(𝔽₂) × GL₂(𝔽₃).
+    |GL₂(𝔽₂)| = (4−1)(4−2) = 6 and |GL₂(𝔽₃)| = (9−1)(9−3) = 48, so the order is 6 · 48 = 288.
+
+- id: alg-s4-false-statement
+  subject: abstract_algebra
+  level: core
+  title: One false statement about S₄
+  statement: Which of the following statements about the symmetric group S₄ is FALSE?
+  answer_type: choice
+  options:
+    - S₄ has exactly 9 elements of order 2.
+    - S₄ has a normal subgroup of order 4.
+    - S₄ has a subgroup of order 12.
+    - S₄ has a normal subgroup of order 8.
+    - Every subgroup of S₄ of order 6 is isomorphic to S₃.
+  answer: D
+  hints:
+    - "Check each statement against what you know about the conjugacy classes and Sylow subgroups of S₄."
+    - "How many Sylow 2-subgroups does S₄ have?"
+  solution: |-
+    (A) True: 6 transpositions + 3 double transpositions = 9.
+    (B) True: the Klein four-group V₄ is normal.
+    (C) True: A₄.
+    (D) False: Sylow 2-subgroups have order 8 and there are 3 of them (conjugate copies of D₄), so none is normal.
+    (E) True: the order-6 subgroups are the four copies of S₃ (S₄ has no element of order 6, so none is cyclic).
+
+- id: la-path-eigenvalue
+  subject: linear_algebra
+  level: core
+  title: Largest eigenvalue of a path
+  statement: Find the largest eigenvalue of the matrix A, the adjacency matrix of a path on four vertices.
+  display: 'A=\begin{pmatrix} 0&1&0&0\\ 1&0&1&0\\ 0&1&0&1\\ 0&0&1&0 \end{pmatrix}'
+  answer_type: value
+  answer: (1+sqrt(5))/2
+  hints:
+    - "Compute the characteristic polynomial; it is a polynomial in λ²."
+    - "Alternatively, the eigenvalues of a path on n vertices are 2cos(kπ/(n+1))."
+  solution: |-
+    The characteristic polynomial is λ⁴ − 3λ² + 1, so λ² = (3 ± √5)/2.
+    The largest root is λ = √((3+√5)/2) = (1+√5)/2, since ((1+√5)/2)² = (3+√5)/2. (Equivalently, 2cos(π/5).)
+
+- id: nt-power-tower
+  subject: number_theory
+  level: core
+  title: The last three digits of a power tower
+  statement: |-
+    Find the last three digits of 7^(7^(7^7)), a tower of three exponents.
+    Give the answer as an integer from 0 to 999.
+  answer_type: value
+  answer: "343"
+  answer_format: An integer from 0 to 999
+  hints:
+    - "Reduce the exponent modulo the order of 7 mod 1000 (it divides 100; in fact it is 20)."
+    - "You then need 7^(7^7) mod 20, which needs 7^7 mod 4."
+  solution: |-
+    7⁴ ≡ 401 and 401⁵ ≡ 1 (mod 1000), so the order of 7 modulo 1000 is 20. We need e = 7^(7^7) mod 20.
+    7⁴ ≡ 1 (mod 20) and 7⁷ ≡ 3 (mod 4), so e ≡ 7³ = 343 ≡ 3 (mod 20).
+    Therefore 7^e ≡ 7³ = 343 (mod 1000).
+
+- id: prob-expected-cycles
+  subject: probability
+  level: core
+  title: Cycles of a random permutation
+  statement: |-
+    A permutation of {1, 2, …, 10} is chosen uniformly at random.
+    What is the expected number of cycles in its cycle decomposition (fixed points count as cycles of length 1)?
+    Give an exact fraction.
+  answer_type: value
+  answer: 7381/2520
+  answer_format: An exact fraction
+  hints:
+    - "Build the permutation one element at a time."
+    - "When you insert element j, with what probability does it start a new cycle?"
+  solution: |-
+    Build a uniform random permutation by inserting 1, 2, …, 10 in turn: element j either starts a new cycle (probability 1/j) or is inserted after one of the j−1 earlier elements.
+    By linearity of expectation, E[#cycles] = 1 + 1/2 + … + 1/10 = H₁₀ = 7381/2520.
+
+- id: cx-residue-e
+  subject: complex_analysis
+  level: core
+  title: A residue computation
+  statement: The contour is traversed once counter-clockwise. Evaluate the integral.
+  display: '\frac{1}{2\pi i}\oint_{|z|=2} \frac{e^{z}}{z^{2}(z-1)}\,dz'
+  answer_type: value
+  answer: e-2
+  hints:
+    - "Which singularities lie inside |z| = 2?"
+    - "The pole at 0 is double: use d/dz of e^z/(z−1) there."
+  solution: |-
+    The poles at z = 0 (double) and z = 1 (simple) are both inside |z| = 2.
+    Res at 1: e^1/1² = e. Res at 0: d/dz [e^z/(z−1)] at 0 = [e^z(z−1) − e^z]/(z−1)² at 0 = −2.
+    The integral equals the sum of the residues: e − 2.
+
+- id: cx-rouche-annulus
+  subject: complex_analysis
+  level: core
+  title: Zeros in an annulus
+  statement: How many zeros, counted with multiplicity, does the polynomial have in the annulus 1 < |z| < 2?
+  display: 'p(z)=z^{7}-5z^{3}+12'
+  answer_type: value
+  answer: "7"
+  answer_format: An integer
+  hints:
+    - "Apply Rouché's theorem on |z| = 1 and on |z| = 2."
+    - "On |z| = 1 compare 12 with |z⁷ − 5z³|. On |z| = 2 compare z⁷ with −5z³ + 12."
+  solution: |-
+    On |z| = 1: |z⁷ − 5z³| ≤ 6 < 12, so p has as many zeros in |z| < 1 as the constant 12, namely none.
+    On |z| = 2: |−5z³ + 12| ≤ 40 + 12 = 52 < 128 = |z⁷|, so p has 7 zeros in |z| < 2.
+    The inequalities are strict, so there are no zeros on either circle, and the annulus contains 7 − 0 = 7 zeros.
+
+- id: top-topologies-3
+  subject: topology
+  level: core
+  title: Counting topologies
+  statement: |-
+    How many distinct topologies are there on the set {1, 2, 3}?
+    (A topology is a collection of subsets containing ∅ and the whole set, closed under unions and finite intersections. Different collections count as different topologies.)
+  answer_type: value
+  answer: "29"
+  answer_format: An integer
+  hints:
+    - "Topologies on a finite set correspond to preorders (reflexive, transitive relations)."
+    - "Group points into equivalence classes, then count partial orders on the classes."
+  solution: |-
+    Topologies on a finite set correspond to preorders. Classify by the partition into equivalence classes, then count labelled partial orders on the classes:
+    one class: 1 partition × 1 = 1; two classes: 3 partitions × 3 partial orders on 2 labelled points = 9; three classes: 19 labelled partial orders on 3 points.
+    Total 1 + 9 + 19 = 29.
+
+# ============================================================================= ADVANCED
+
+- id: ana-arctan-telescoping
+  subject: analysis
+  level: advanced
+  title: An arctangent series
+  statement: Evaluate the infinite sum.
+  display: '\sum_{n=1}^{\infty} \arctan\left(\frac{2}{n^{2}}\right)'
+  answer_type: value
+  answer: 3*pi/4
+  hints:
+    - "Find angles α, β built from n+1 and n−1 with tan(α − β) = 2/n²."
+    - "Try arctan(n+1) − arctan(n−1) and use the subtraction formula for tangent."
+  solution: |-
+    tan(arctan(n+1) − arctan(n−1)) = [(n+1) − (n−1)]/[1 + (n+1)(n−1)] = 2/n², and the angle lies in (0, π/2), so arctan(2/n²) = arctan(n+1) − arctan(n−1).
+    The sum telescopes: Σ_{n=1}^{N} = arctan(N+1) + arctan(N) − arctan(1) − arctan(0) → π/2 + π/2 − π/4 = 3π/4.
+
+- id: ana-sinc-cubed
+  subject: analysis
+  level: advanced
+  title: The cube of the sinc function
+  statement: Evaluate the improper integral.
+  display: '\int_{0}^{\infty} \left(\frac{\sin x}{x}\right)^{3} dx'
+  answer_type: value
+  answer: 3*pi/8
+  hints:
+    - "The Fourier transform of sin x / x is π times the indicator function of [−1, 1]."
+    - "A product of functions becomes a convolution of transforms: you need the value at 0 of a triple convolution of box functions."
+  solution: |-
+    Let f(x) = sin x / x, with transform f̂(ω) = π·1_{[−1,1]}(ω). Then the transform of f³ is (2π)⁻² f̂∗f̂∗f̂ = (π/4)(box∗box∗box)(ω).
+    box∗box(ω) = (2 − |ω|)₊, so (box∗box∗box)(0) = ∫_{−1}^{1} (2 − |ω|) dω = 3.
+    Hence ∫_{−∞}^{∞} f³ dx = (π/4)·3 = 3π/4, and by evenness ∫₀^∞ f³ dx = 3π/8.
+
+- id: ana-sine-iteration
+  subject: analysis
+  level: advanced
+  title: Iterating the sine
+  statement: "Let a₁ = 1 and a_{n+1} = sin(a_n) for n ≥ 1. Find lim n·a_n² as n → ∞."
+  answer_type: value
+  answer: "3"
+  answer_format: A number
+  hints:
+    - "Show a_n decreases to 0, then study 1/a_{n+1}² − 1/a_n²."
+    - "Expand 1/sin²t = 1/t² + 1/3 + O(t²) and use the Stolz–Cesàro theorem."
+  solution: |-
+    (a_n) is positive and decreasing, so it converges, and the limit L satisfies L = sin L, i.e. L = 0.
+    Since 1/sin²t = 1/t² + 1/3 + O(t²), we get 1/a_{n+1}² − 1/a_n² → 1/3.
+    By Stolz–Cesàro, (1/a_n²)/n → 1/3, so n·a_n² → 3.
+
+- id: ana-x-cot-x
+  subject: analysis
+  level: advanced
+  title: An integral with a cotangent
+  statement: Evaluate the integral.
+  display: '\int_{0}^{\pi/2} x\cot x\,dx'
+  answer_type: value
+  answer: pi*ln(2)/2
+  hints:
+    - "Integrate by parts with u = x and dv = cot x dx."
+    - "You will need ∫₀^{π/2} ln sin x dx. Use ∫ ln sin = ∫ ln cos and sin 2x = 2 sin x cos x."
+  solution: |-
+    By parts, ∫₀^{π/2} x cot x dx = [x ln sin x]₀^{π/2} − ∫₀^{π/2} ln sin x dx = 0 − I, where I = ∫₀^{π/2} ln sin x dx.
+    By symmetry I = ∫ ln cos x dx, so 2I = ∫ ln(sin x cos x) dx = ∫ ln(sin 2x) dx − (π/2) ln 2 = I − (π/2) ln 2. Hence I = −(π/2) ln 2.
+    The integral equals (π/2) ln 2.
+
+- id: alg-units-involutions
+  subject: abstract_algebra
+  level: advanced
+  title: Elements of order 2 in a unit group
+  statement: How many elements of order 2 does the multiplicative group (ℤ/360ℤ)^× have?
+  answer_type: value
+  answer: "15"
+  answer_format: An integer
+  hints:
+    - "Use the Chinese remainder theorem: 360 = 8 · 9 · 5."
+    - "In each factor, count the solutions of x² = 1."
+  solution: |-
+    By CRT, (ℤ/360)^× ≅ (ℤ/8)^× × (ℤ/9)^× × (ℤ/5)^× ≅ (C₂×C₂) × C₆ × C₄.
+    The equation x² = 1 has 4, 2 and 2 solutions in the three factors, so 4·2·2 = 16 elements satisfy x² = 1.
+    Removing the identity leaves 15 elements of order 2.
+
+- id: alg-gaussian-homs
+  subject: abstract_algebra
+  level: advanced
+  title: Homomorphisms from the Gaussian integers
+  statement: How many unital ring homomorphisms are there from the Gaussian integers ℤ[i] to ℤ/65ℤ?
+  answer_type: value
+  answer: "4"
+  answer_format: An integer
+  hints:
+    - "ℤ[i] ≅ ℤ[x]/(x² + 1). A homomorphism is determined by the image of i."
+    - "Count the solutions of t² ≡ −1 (mod 65) using the Chinese remainder theorem."
+  solution: |-
+    A unital homomorphism ℤ[x]/(x²+1) → ℤ/65 is determined by the image t of x, which must satisfy t² ≡ −1 (mod 65), and every such t works.
+    Modulo 5 there are 2 solutions (±2) and modulo 13 there are 2 (±5), so by CRT there are 2 · 2 = 4.
+
+- id: alg-gl2f5-order3
+  subject: abstract_algebra
+  level: advanced
+  title: Elements of order 3 in GL₂(𝔽₅)
+  statement: How many elements of order 3 does the group GL₂(𝔽₅) have?
+  answer_type: value
+  answer: "20"
+  answer_format: An integer
+  hints:
+    - "Such a matrix satisfies x³ = 1 and its minimal polynomial divides (x − 1)(x² + x + 1)."
+    - "Is x² + x + 1 irreducible over 𝔽₅? Then count a conjugacy class using its centralizer."
+  solution: |-
+    The discriminant of x² + x + 1 is −3 ≡ 2, a non-residue mod 5, so it is irreducible over 𝔽₅. A 2×2 matrix of order 3 has minimal polynomial dividing (x−1)(x²+x+1) and is not the identity, so its minimal (= characteristic) polynomial is x² + x + 1.
+    All such matrices form one conjugacy class, whose centralizer is 𝔽₂₅^× of order 24. Since |GL₂(𝔽₅)| = (25−1)(25−5) = 480, the class has 480/24 = 20 elements.
+
+- id: alg-commuting-involutions
+  subject: abstract_algebra
+  level: advanced
+  title: Homomorphisms from the Klein four-group
+  statement: How many group homomorphisms are there from the Klein four-group ℤ/2 × ℤ/2 to S₅?
+  answer_type: value
+  answer: "196"
+  answer_format: An integer
+  hints:
+    - "A homomorphism is a pair (a, b) with a² = b² = e and ab = ba."
+    - "Classify a by cycle type and count the elements of order at most 2 in its centralizer."
+  solution: |-
+    Count pairs (a, b) with a² = b² = e and ab = ba.
+    a = e: b is the identity or an involution (10 transpositions + 15 double transpositions): 26.
+    a a transposition (10 of them): the centralizer is ⟨(12)⟩ × S₃ with 2 · 4 = 8 elements satisfying b² = e: 80.
+    a a double transposition (15 of them): the centralizer is D₄ with 6 such elements: 90.
+    Total 26 + 80 + 90 = 196.
+
+- id: la-hilbert-det
+  subject: linear_algebra
+  level: advanced
+  title: The Hilbert determinant
+  statement: |-
+    Let H be the 5×5 Hilbert matrix with entries H_ij = 1/(i + j − 1).
+    Compute det H exactly.
+  display: 'H_{ij}=\frac{1}{i+j-1},\quad 1\leq i,j\leq 5'
+  answer_type: value
+  answer: 1/266716800000
+  answer_format: An exact fraction
+  hints:
+    - "H is a Cauchy matrix: entries 1/(x_i + y_j) with x_i = i and y_j = j − 1."
+    - "Cauchy's determinant formula gives det H_n = c_n⁴ / c_{2n}, where c_m = 1!·2!·…·(m−1)!."
+  solution: |-
+    Cauchy's formula det[1/(x_i + y_j)] = ∏_{i<j}(x_j − x_i)(y_j − y_i) / ∏_{i,j}(x_i + y_j) specialises to det H_n = c_n⁴ / c_{2n} with c_m = ∏_{k=1}^{m−1} k!.
+    For n = 5: c₅ = 1!·2!·3!·4! = 288 and c₁₀ = 1!·2!·…·9!, which gives det H₅ = 288⁴ / c₁₀ = 1/266716800000.
+
+- id: la-gcd-det
+  subject: linear_algebra
+  level: advanced
+  title: The gcd matrix
+  statement: Let A be the 8×8 matrix with entries A_ij = gcd(i, j). Compute det A.
+  answer_type: value
+  answer: "768"
+  answer_format: An integer
+  hints:
+    - "Write gcd(i, j) = Σ_{d | i, d | j} φ(d), where φ is Euler's totient function."
+    - "That factors A as E · diag(φ(1), …, φ(8)) · Eᵀ with E triangular."
+  solution: |-
+    Since Σ_{d|n} φ(d) = n applied to n = gcd(i, j), we have gcd(i, j) = Σ_{d | i, d | j} φ(d). So A = E D Eᵀ where E_{id} = 1 if d | i (lower unitriangular) and D = diag(φ(1), …, φ(8)).
+    det A = ∏_{d=1}^{8} φ(d) = 1·1·2·2·4·2·6·4 = 768.
+
+- id: la-idempotents-f2
+  subject: linear_algebra
+  level: advanced
+  title: Idempotent matrices over 𝔽₂
+  statement: How many 3×3 matrices A with entries in the field 𝔽₂ satisfy A² = A?
+  answer_type: value
+  answer: "58"
+  answer_format: An integer
+  hints:
+    - "Idempotents correspond to decompositions 𝔽₂³ = im A ⊕ ker A."
+    - "Split by rank r and count pairs of complementary subspaces."
+  solution: |-
+    A is determined by the pair (im A, ker A) of complementary subspaces.
+    r = 0 and r = 3: 1 matrix each. r = 1: 7 choices of line, and the complementary planes are those not containing it: 7 − 3 = 4, giving 28. r = 2: 7 planes, and 4 lines not in each, giving 28.
+    Total 1 + 28 + 28 + 1 = 58.
+
+- id: la-nilpotent-f3
+  subject: linear_algebra
+  level: advanced
+  title: Nilpotent matrices over 𝔽₃
+  statement: How many 3×3 matrices A with entries in 𝔽₃ satisfy A³ = 0?
+  answer_type: value
+  answer: "729"
+  answer_format: An integer
+  hints:
+    - "Classify by Jordan type: zero, one block of size 2, or one block of size 3."
+    - "Count rank-1 nilpotents as v·wᵀ with wᵀv = 0, and use orbit-stabiliser for the regular ones (|GL₃(𝔽₃)| = 11232)."
+  solution: |-
+    Zero matrix: 1.
+    Rank 1 (Jordan type (2,1)): A = v·wᵀ with v, w ≠ 0 and wᵀv = 0, counted up to (v, w) ~ (cv, c⁻¹w): 26 · 8 / 2 = 104.
+    Regular nilpotents (one 3×3 block): the centralizer of N is {a + bN + cN² : a ≠ 0}, of order 2 · 9 = 18, so there are 11232 / 18 = 624.
+    Total 1 + 104 + 624 = 729 = 3⁶, as predicted by the Fine–Herstein theorem (q^{n(n−1)}).
+
+- id: nt-two-squares-mod-65
+  subject: number_theory
+  level: advanced
+  title: Points on a conic mod 65
+  statement: How many ordered pairs (x, y) in (ℤ/65ℤ)² satisfy x² + y² ≡ 0 (mod 65)?
+  answer_type: value
+  answer: "225"
+  answer_format: An integer
+  hints:
+    - "Use the Chinese remainder theorem to count modulo 5 and modulo 13 separately."
+    - "For a prime p ≡ 1 (mod 4), −1 is a square: factor x² + y² over 𝔽_p."
+  solution: |-
+    Modulo a prime p ≡ 1 (mod 4), write −1 = s². Then x² + y² = (x + sy)(x − sy), and (u, v) = (x + sy, x − sy) is an invertible change of variables, so the solutions of uv = 0 number 2p − 1.
+    p = 5 gives 9 and p = 13 gives 25. By CRT the count modulo 65 is 9 · 25 = 225.
+
+- id: nt-consecutive-residues
+  subject: number_theory
+  level: advanced
+  title: Consecutive quadratic residues
+  statement: For the prime p = 101, how many integers a with 1 ≤ a ≤ 99 have the property that both a and a + 1 are quadratic residues modulo p?
+  answer_type: value
+  answer: "24"
+  answer_format: An integer
+  hints:
+    - "Write the indicator of 'a is a nonzero square' as (1 + χ(a))/2 with χ the Legendre symbol, and multiply two of them."
+    - "You need Σ χ(a), Σ χ(a+1) and Σ χ(a(a+1)) over the range."
+  solution: |-
+    Let χ be the Legendre symbol. The count is N = ¼ Σ_{a=1}^{p−2} (1 + χ(a))(1 + χ(a+1)).
+    Since p ≡ 1 (mod 4), χ(−1) = 1: Σ_{a=1}^{p−2} χ(a) = −χ(p−1) = −1 and Σ_{a=1}^{p−2} χ(a+1) = −χ(1) = −1. Also Σ_{a=1}^{p−2} χ(a(a+1)) = −1 (the complete sum of χ(a² + a) over 𝔽_p is −1).
+    Hence N = (p − 2 − 1 − 1 − 1)/4 = (p − 5)/4 = 24.
+
+- id: nt-sum-phi-floor
+  subject: number_theory
+  level: advanced
+  title: A totient sum
+  statement: Compute the sum, where φ is Euler's totient function.
+  display: '\sum_{n=1}^{200} \varphi(n)\left\lfloor \frac{200}{n} \right\rfloor'
+  answer_type: value
+  answer: "20100"
+  answer_format: An integer
+  hints:
+    - "Interpret ⌊200/n⌋ as the number of multiples of n up to 200 and swap the order of summation."
+    - "Recall Σ_{d | k} φ(d) = k."
+  solution: |-
+    Σ_{n≤N} φ(n)⌊N/n⌋ counts, for each k ≤ N, the sum of φ(d) over the divisors d of k. So it equals Σ_{k≤N} Σ_{d|k} φ(d) = Σ_{k≤N} k = N(N+1)/2.
+    For N = 200 this is 20100.
+
+- id: nt-quartic-residue-primes
+  subject: number_theory
+  level: advanced
+  title: When is −1 a fourth power?
+  statement: Find the sum of all odd primes p < 100 for which the congruence x⁴ ≡ −1 (mod p) has a solution.
+  answer_type: value
+  answer: "317"
+  answer_format: An integer
+  hints:
+    - "(ℤ/p)^× is cyclic. A solution of x⁴ ≡ −1 is an element of a very specific order."
+    - "Such an element has order exactly 8. When does a cyclic group of order p − 1 contain one?"
+  solution: |-
+    x⁴ ≡ −1 means x has order exactly 8 in the cyclic group (ℤ/p)^× of order p − 1. Such an element exists iff 8 | p − 1, i.e. p ≡ 1 (mod 8).
+    The primes below 100 with p ≡ 1 (mod 8) are 17, 41, 73, 89, 97, and their sum is 317.
+
+- id: comb-domino-3xn
+  subject: combinatorics
+  level: advanced
+  title: Domino tilings of a 3 × 10 board
+  statement: In how many ways can a 3 × 10 rectangle be tiled with 1 × 2 dominoes (placed horizontally or vertically)?
+  answer_type: value
+  answer: "571"
+  answer_format: An integer
+  hints:
+    - "Let a_n count tilings of a 3 × n board. Look at how the first column is covered."
+    - "You will need a second sequence b_n for a 3 × n board with one corner cell of the first column removed."
+  solution: |-
+    Let a_n count tilings of 3 × n and b_n tilings of 3 × n with a corner cell of the first column removed. Classifying how the first column is covered gives a_n = a_{n−2} + 2·b_{n−1} and b_n = a_{n−1} + b_{n−2}, with a₀ = 1 and b₁ = 1.
+    This yields a₂, a₄, a₆, a₈, a₁₀ = 3, 11, 41, 153, 571 (odd n gives 0).
+
+- id: comb-row-col-sums
+  subject: combinatorics
+  level: advanced
+  title: Binary matrices with row and column sums 2
+  statement: How many 5 × 5 matrices with entries in {0, 1} have exactly two 1s in every row and in every column?
+  answer_type: value
+  answer: "2040"
+  answer_format: An integer
+  hints:
+    - "Think of the matrix as a bipartite graph in which every vertex has degree 2."
+    - "Such a graph is a disjoint union of even cycles, each of length at least 4. Which cycle structures use 5 + 5 vertices?"
+  solution: |-
+    A 2-regular bipartite graph on 5 + 5 vertices is a union of even cycles of length ≥ 4, so the cycle lengths are (10) or (4, 6).
+    One 10-cycle: the number of Hamiltonian cycles of K_{5,5} is 5!·4!/2 = 1440.
+    A 4-cycle plus a 6-cycle: choose the 2 + 2 vertices of the 4-cycle in C(5,2)² = 100 ways, then 1 four-cycle on K_{2,2} and 3!·2!/2 = 6 six-cycles on K_{3,3}: 600.
+    Total 1440 + 600 = 2040.
+
+- id: prob-hhthh
+  subject: probability
+  level: advanced
+  title: Waiting for HHTHH
+  statement: A fair coin is flipped repeatedly. What is the expected number of flips until the pattern HHTHH first appears?
+  answer_type: value
+  answer: "38"
+  answer_format: A number
+  hints:
+    - "Overlaps matter: compare the pattern with its own shifted copies."
+    - "Use the martingale (gamblers) argument, or set up a Markov chain on the length of the longest matched prefix."
+  solution: |-
+    By the overlap (Conway) formula, E = Σ 2^k over all k for which the first k letters of the pattern equal its last k letters.
+    For HHTHH: k = 5 (the whole pattern), k = 2 (HH), k = 1 (H); k = 3 (HHT vs THH) and k = 4 (HHTH vs HTHH) fail.
+    E = 2⁵ + 2² + 2¹ = 38.
+
+- id: prob-floor-ratio-even
+  subject: probability
+  level: advanced
+  title: The integer part of a ratio
+  statement: |-
+    X and Y are independent and uniformly distributed on (0, 1).
+    What is the probability that ⌊X/Y⌋ is even? (0 counts as even.)
+  answer_type: value
+  answer: 1 - ln(2)/2
+  hints:
+    - "Compute P(⌊X/Y⌋ = k) for each k: for k ≥ 1 it is the area between two lines through the origin."
+    - "You will get terms 1/(2k(k+1)); sum those with k even and recognise ln 2."
+  solution: |-
+    P(⌊X/Y⌋ = 0) = P(X < Y) = 1/2. For k ≥ 1, P(k ≤ X/Y < k+1) = ∫₀¹ x(1/k − 1/(k+1)) dx = 1/(2k(k+1)).
+    The even k ≥ 2 contribute ½ Σ_{k even}(1/k − 1/(k+1)) = ½(1/2 − 1/3 + 1/4 − …) = ½(1 − ln 2).
+    Total: 1/2 + ½(1 − ln 2) = 1 − (ln 2)/2.
+
+- id: cx-trig-integral
+  subject: complex_analysis
+  level: advanced
+  title: A trigonometric integral via residues
+  statement: Evaluate the integral.
+  display: '\int_{0}^{2\pi} \frac{d\theta}{(2+\cos\theta)^{2}}'
+  answer_type: value
+  answer: 4*pi/(3*sqrt(3))
+  hints:
+    - "Substitute z = e^{iθ} to get a contour integral over the unit circle."
+    - "The denominator becomes (z² + 4z + 1)²; only the root −2 + √3 lies inside the circle."
+  solution: |-
+    With z = e^{iθ}: 2 + cos θ = (z² + 4z + 1)/(2z) and dθ = dz/(iz), so the integral is (1/i)∮ 4z/(z² + 4z + 1)² dz.
+    The only pole inside |z| = 1 is the double pole z₀ = −2 + √3 (the other root is z₁ = −2 − √3). The residue there is d/dz[4z/(z − z₁)²] at z₀ = 4/(z₀−z₁)² − 8z₀/(z₀−z₁)³ = 2/(3√3).
+    The integral is (1/i)·2πi·2/(3√3) = 4π/(3√3).
+
+- id: top-t0-topologies
+  subject: topology
+  level: advanced
+  title: T₀ topologies on three points
+  statement: How many T₀ topologies are there on the set {1, 2, 3}?
+  answer_type: value
+  answer: "19"
+  answer_format: An integer
+  hints:
+    - "A topology on a finite set is determined by its specialisation preorder."
+    - "T₀ means the preorder is antisymmetric: count partial orders on three labelled points."
+  solution: |-
+    T₀ topologies on a finite set correspond to partial orders on it. Counting labelled partial orders on {1, 2, 3} by shape:
+    antichain: 1; one relation a < b with c isolated: 6; a chain: 6; a < b and a < c (one minimal element): 3; a < c and b < c (one maximal element): 3.
+    Total 1 + 6 + 6 + 3 + 3 = 19.
+
+# ============================================================================= CHALLENGE
+
+- id: ana-recurrence-log
+  subject: analysis
+  level: challenge
+  title: A recurrence with a logarithmic correction
+  statement: "Let a₁ = 1 and a_{n+1} = a_n + 1/a_n for n ≥ 1. Find lim (a_n² − 2n)/ln n as n → ∞."
+  display: 'a_{1}=1,\quad a_{n+1}=a_n+\frac{1}{a_n},\quad \lim_{n\to\infty}\frac{a_n^{2}-2n}{\ln n}'
+  answer_type: value
+  answer: 1/2
+  hints:
+    - "Square the recurrence: a_{n+1}² = a_n² + 2 + 1/a_n²."
+    - "Sum it up. First show a_n² ~ 2n, then determine the growth of Σ 1/a_k²."
+  solution: |-
+    Squaring gives a_{n+1}² = a_n² + 2 + 1/a_n², so a_n² = 2n − 1 + Σ_{k<n} 1/a_k².
+    Since a_k² ≥ 2k − 1, we get a_n² ~ 2n (the correction is only logarithmic), hence 1/a_k² ~ 1/(2k) and Σ_{k<n} 1/a_k² ~ ½ ln n.
+    Therefore (a_n² − 2n)/ln n → 1/2.
+
+- id: la-max-det-pm1
+  subject: linear_algebra
+  level: challenge
+  title: The largest ±1 determinant
+  statement: What is the largest possible determinant of a 5×5 matrix all of whose entries are +1 or −1?
+  answer_type: value
+  answer: "48"
+  answer_format: An integer
+  hints:
+    - "Hadamard's inequality bounds |det| by 5^{5/2} ≈ 55.9."
+    - "Subtract the first row from the others: what does that tell you about divisibility of the determinant?"
+  solution: |-
+    Hadamard's inequality gives |det| ≤ 5^{5/2} ≈ 55.9. Subtracting the first row from the other four leaves rows with entries in {0, ±2}, so det is divisible by 2⁴ = 16.
+    The multiples of 16 up to 55 are 0, 16, 32, 48, so |det| ≤ 48.
+    This is attained by J − 2I (all ones, with −1 on the diagonal): its eigenvalues are 3 and −2 (four times), so det = 3 · (−2)⁴ = 48.
+
+- id: comb-spanning-trees-q4
+  subject: combinatorics
+  level: challenge
+  title: Spanning trees of the 4-cube
+  statement: How many spanning trees does the graph of the 4-dimensional hypercube Q₄ (16 vertices, 32 edges) have?
+  answer_type: value
+  answer: "42467328"
+  answer_format: An integer
+  hints:
+    - "Use the matrix-tree theorem: τ(G) = (1/n) · (product of the nonzero Laplacian eigenvalues)."
+    - "The Laplacian eigenvalues of Qₙ are 2k with multiplicity C(n, k)."
+  solution: |-
+    The Laplacian of Q₄ has eigenvalues 0 (×1), 2 (×4), 4 (×6), 6 (×4), 8 (×1).
+    By the matrix-tree theorem, τ = (1/16) · 2⁴ · 4⁶ · 6⁴ · 8 = 4096 · 1296 · 8 = 42467328.
+
+- id: comb-cube-edge-colorings
+  subject: combinatorics
+  level: challenge
+  title: Colouring the edges of a cube
+  statement: |-
+    Each of the 12 edges of a cube is coloured red, green or blue. Two colourings are considered the same if one can be turned into the other by a rotation of the cube (reflections are not allowed).
+    How many distinct colourings are there?
+  answer_type: value
+  answer: "22815"
+  answer_format: An integer
+  hints:
+    - "Use Burnside's lemma with the 24 rotations of the cube."
+    - "For each type of rotation, count the cycles of its action on the 12 edges."
+  solution: |-
+    Burnside: average 3^{#cycles on edges} over the 24 rotations.
+    identity: 3¹² = 531441. Face rotations by ±90° (6 of them): 3 four-cycles, 3³ = 27. Face rotations by 180° (3): 6 two-cycles, 3⁶ = 729.
+    Vertex rotations by ±120° (8): 4 three-cycles, 3⁴ = 81. Edge rotations by 180° (6): 2 fixed edges and 5 two-cycles, 3⁷ = 2187.
+    Sum = 531441 + 6·27 + 3·729 + 8·81 + 6·2187 = 547560, and 547560 / 24 = 22815.
+
+- id: prob-uniform-sum-exceeds-2
+  subject: probability
+  level: challenge
+  title: How many uniforms to exceed 2?
+  statement: |-
+    U₁, U₂, … are independent and uniformly distributed on (0, 1). Let N be the smallest n with U₁ + … + U_n > 2.
+    Find E[N].
+  answer_type: value
+  answer: e^2 - e
+  hints:
+    - "E[N] = Σ_{k≥0} P(N > k) = Σ_{k≥0} P(U₁ + … + U_k ≤ 2)."
+    - "Use the Irwin–Hall distribution function, P(S_k ≤ t) = Σ_j (−1)^j C(k, j)(t − j)^k / k!, and sum over k first."
+  solution: |-
+    E[N] = Σ_{k≥0} P(S_k ≤ 2) with P(S_k ≤ t) = Σ_{j=0}^{⌊t⌋} (−1)^j C(k, j)(t − j)^k / k!.
+    Summing over k first: Σ_k C(k, j) s^k / k! = s^j e^s / j!. Hence E[N] = Σ_{j=0}^{2} (−1)^j (2 − j)^j e^{2−j} / j! = e² − e + 0.
+    So E[N] = e² − e ≈ 4.671. (For threshold 1 the same computation gives the classical answer e.)
+
+- id: top-3-sheeted-covers
+  subject: topology
+  level: challenge
+  title: Three-sheeted covers of a figure eight
+  statement: |-
+    Up to isomorphism of covering spaces (not preserving base points), how many connected 3-sheeted covering spaces does the figure-eight space S¹ ∨ S¹ have?
+  answer_type: value
+  answer: "7"
+  answer_format: An integer
+  hints:
+    - "Connected n-sheeted covers correspond to conjugacy classes of index-n subgroups of π₁ = F₂."
+    - "Equivalently: transitive pairs (σ, τ) in S₃ × S₃ (the monodromy of the two loops), up to simultaneous conjugation."
+  solution: |-
+    Covers correspond to pairs (σ, τ) ∈ S₃² generating a transitive subgroup, up to simultaneous conjugation by S₃.
+    Pairs inside A₃ = C₃, not both trivial: 8 pairs, and conjugation by a transposition inverts both, so they form 4 orbits.
+    Pairs generating S₃: 36 total minus 18 lying in a proper subgroup (9 in C₃ plus 3 · 3 more in the three C₂'s) = 18, which form 18/6 = 3 free orbits.
+    Total 4 + 3 = 7.
+
+- id: geo-tricylinder
+  subject: geometry
+  level: challenge
+  title: Three intersecting cylinders
+  statement: Find the volume of the solid consisting of all points (x, y, z) in ℝ³ satisfying all three inequalities.
+  display: 'x^{2}+y^{2}\leq 1,\quad y^{2}+z^{2}\leq 1,\quad x^{2}+z^{2}\leq 1'
+  answer_type: value
+  answer: 8*(2-sqrt(2))
+  hints:
+    - "Use the symmetry: the solid is the union of 48 congruent pieces. Work in the region x ≥ y ≥ z ≥ 0."
+    - "In that region only x² + y² ≤ 1 is binding, and z runs from 0 to y. Use polar coordinates in (x, y)."
+  solution: |-
+    The solid has the full symmetry of the cube's coordinate permutations and sign changes, so it is 48 copies of the piece x ≥ y ≥ z ≥ 0. There the largest two coordinates are x and y, so the only binding constraint is x² + y² ≤ 1.
+    The piece has volume ∫∫_{x ≥ y ≥ 0, x²+y² ≤ 1} y dx dy = ∫₀^{π/4}∫₀¹ r sin φ · r dr dφ = (1/3)(1 − √2/2).
+    Total: 48 · (1/3)(1 − √2/2) = 16 − 8√2 = 8(2 − √2) ≈ 4.686.
+
+- id: cx-sum-one-over-n2plus1
+  subject: complex_analysis
+  level: challenge
+  title: A sum evaluated with residues
+  statement: |-
+    Find the exact value of the sum.
+    (The calculator has no coth, so write it with cosh and sinh.)
+  display: '\sum_{n=1}^{\infty} \frac{1}{n^{2}+1}'
+  answer_type: value
+  answer: (pi*cosh(pi)/sinh(pi) - 1)/2
+  answer_format: "A closed form using pi, cosh and sinh"
+  hints:
+    - "Integrate π cot(πz)/(z² + 1) over large circles. The residue at each integer n is 1/(n² + 1)."
+    - "The poles at ±i contribute −(π/2)coth π each, and the integral over the circle tends to 0."
+  solution: |-
+    The function π cot(πz)/(z² + 1) has residue 1/(n² + 1) at each integer n, and the integrals over the circles |z| = N + 1/2 tend to 0, so the sum of all residues is 0.
+    At z = ±i: cot(πi) = −i coth π, so each residue is −(π/2) coth π.
+    Hence Σ_{n∈ℤ} 1/(n² + 1) = π coth π, and removing n = 0 and halving: Σ_{n≥1} 1/(n² + 1) = (π coth π − 1)/2.

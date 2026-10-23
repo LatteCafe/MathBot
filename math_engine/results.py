@@ -12,3 +12,5 @@ class MathResult:
     established: bool = True        # False when the result could NOT be established
     note: str | None = None         # extra context, e.g. "solutions over the real numbers"
     approximate_only: bool = False  # True when `text` is itself a decimal approximation (e.g. /evaluate)
+    summary: str | None = None      # short description of a very large result, e.g. "integer with 2,997 digits ..."
+    truncated: bool = False         # True when `text` is incomplete because the result exceeded the hard size limit

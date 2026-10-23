@@ -8,24 +8,33 @@ import sys
 import discord
 from discord.ext import commands
 
+from cogs.membership import invite_url
+from cogs.presence import initial_activity
 from config import ConfigError, Settings
 from database.db import Database
+from database.potd_repo import PotdRepository
 from math_engine.engine import MathEngine
 from math_engine.sandbox import Sandbox
 from rendering.renderer import LatexRenderer
+from services.potd import PotdService
+from services.problem_bank import ProblemBank, ProblemBankError, load_bank
 
 log = logging.getLogger("mathbot")
-EXTENSIONS = ("cogs.core", "cogs.calc", "cogs.latex")
+EXTENSIONS = ("cogs.core", "cogs.calc", "cogs.latex", "cogs.potd", "cogs.presence")
 
 
 class MathBot(commands.Bot):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, bank: ProblemBank) -> None:
         super().__init__(
             command_prefix=commands.when_mentioned,       # slash commands only; no message-content intent needed
             intents=discord.Intents.default(),
             allowed_mentions=discord.AllowedMentions.none(),  # echoed user text can never ping anyone
+            status=discord.Status(settings.bot_status),       # sent with the login, so the bot is "online" at once
+            activity=initial_activity(settings, len(bank)),
         )
         self.settings = settings
+        self.bank = bank
+        self.latest_problem_title: str | None = None
         # One shared sandbox: calculations and rendering draw from the same pool of worker slots.
         self.sandbox = Sandbox(
             timeout=settings.math_timeout_seconds,
@@ -39,6 +48,7 @@ class MathBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         self.db = await Database.open(self.settings.database_path)
+        self.potd_service = PotdService(PotdRepository(self.db), self.bank, self.engine)
         for ext in EXTENSIONS:
             await self.load_extension(ext)
         if self.settings.dev_guild_id:
@@ -53,7 +63,10 @@ class MathBot(commands.Bot):
         self._warm_up_task = asyncio.create_task(self.renderer.warm_up())
 
     async def on_ready(self) -> None:
-        log.info("Logged in as %s (id=%s)", self.user, getattr(self.user, "id", "?"))
+        log.info("Logged in as %s (id=%s) in %d server(s)", self.user, getattr(self.user, "id", "?"), len(self.guilds))
+        url = invite_url(self.application_id or getattr(self.user, "id", None))
+        if url:
+            log.info("Invite link (adds the bot as a real server member): %s", url)
 
     async def close(self) -> None:
         if self.db:
@@ -72,7 +85,12 @@ def main() -> None:
     except ConfigError as exc:
         sys.exit(f"Configuration error: {exc}")
     logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)-8s %(name)s: %(message)s")
-    MathBot(settings).run(settings.discord_token, log_handler=None)  # we configured logging ourselves
+    try:
+        bank = load_bank(settings.problems_path)        # a broken problem file stops the bot at start-up, with a clear message
+    except ProblemBankError as exc:
+        sys.exit(str(exc))
+    log.info("Loaded %d problems", len(bank))
+    MathBot(settings, bank).run(settings.discord_token, log_handler=None)  # we configured logging ourselves
 
 
 if __name__ == "__main__":
