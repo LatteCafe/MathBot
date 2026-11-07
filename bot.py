@@ -6,6 +6,7 @@ import logging
 import sys
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from cogs.membership import invite_url
@@ -51,6 +52,10 @@ class MathBot(commands.Bot):
         self.potd_service = PotdService(PotdRepository(self.db), self.bank, self.engine)
         for ext in EXTENSIONS:
             await self.load_extension(ext)
+        # Allow every command in servers, DMs and group DMs, and when the app is installed to a user account.
+        for cmd in self.tree.get_commands():
+            cmd.allowed_installs = app_commands.AppInstallationType(guild=True, user=True)
+            cmd.allowed_contexts = app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True)
         if self.settings.dev_guild_id:
             guild = discord.Object(id=self.settings.dev_guild_id)
             self.tree.copy_global_to(guild=guild)
